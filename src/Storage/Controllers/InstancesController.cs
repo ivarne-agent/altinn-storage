@@ -394,7 +394,7 @@ public class InstancesController : ControllerBase
                 appInfo.Org,
                 appInfo.Id.Split('/')[1],
                 HttpContext.User,
-                "instantiate",
+                AuthorizationActions.Instantiate,
                 instanceOwnerPartyId,
                 null
             );
@@ -1283,7 +1283,7 @@ public class InstancesController : ControllerBase
             queryParameters.Org,
             appId,
             HttpContext.User,
-            "read"
+            AuthorizationActions.Read
         );
         XacmlJsonResponse response;
         try

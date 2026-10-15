@@ -70,20 +70,20 @@ public class AuthorizationService(
         }
 
         SortedList<Guid, MessageBoxInstance> authorizedInstanceList = [];
-        List<string> actionTypes = ["read"];
+        List<string> actionTypes = [AuthorizationActions.Read];
         if (_settings.AuthorizeA2ListInstancesWrite || keyAccessMode)
         {
-            actionTypes.Add("write");
+            actionTypes.Add(AuthorizationActions.Write);
         }
 
         if (_settings.AuthorizeA2ListInstancesDelete || keyAccessMode)
         {
-            actionTypes.Add("delete");
+            actionTypes.Add(AuthorizationActions.Delete);
         }
 
         if (keyAccessMode)
         {
-            actionTypes.Add("instantiate");
+            actionTypes.Add(AuthorizationActions.Instantiate);
         }
 
         if (
@@ -96,7 +96,7 @@ public class AuthorizationService(
             )
         )
         {
-            actionTypes.Add("sign");
+            actionTypes.Add(AuthorizationActions.Sign);
         }
 
         ClaimsPrincipal user = _claimsPrincipalProvider.GetUser();
@@ -152,19 +152,19 @@ public class AuthorizationService(
 
                 switch (actiontype)
                 {
-                    case "write":
+                    case AuthorizationActions.Write:
                         authorizedMessageBoxInstance.AuthorizedForWrite = true;
                         break;
-                    case "delete":
+                    case AuthorizationActions.Delete:
                         authorizedMessageBoxInstance.AllowDelete = true;
                         break;
-                    case "instantiate":
+                    case AuthorizationActions.Instantiate:
                         authorizedMessageBoxInstance.AllowNewCopy = true;
                         break;
-                    case "sign":
+                    case AuthorizationActions.Sign:
                         authorizedMessageBoxInstance.AuthorizedForSign = true;
                         break;
-                    case "read":
+                    case AuthorizationActions.Read:
                         break;
                 }
             }
@@ -325,7 +325,7 @@ public class AuthorizationService(
         }
 
         List<InstanceInternal> authorizedInstanceList = [];
-        List<string> actionTypes = new() { "read" };
+        List<string> actionTypes = new() { AuthorizationActions.Read };
 
         ClaimsPrincipal user = _claimsPrincipalProvider.GetUser();
         XacmlJsonRequestRoot xacmlJsonRequest = CreateMultiDecisionRequest(
