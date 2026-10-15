@@ -418,7 +418,8 @@ public class StorageAtomicSequencingRegressionTests : IClassFixture<StorageAtomi
             CreateInstanceEventService().Object,
             cleanupService,
             CreateApplicationService().Object,
-            dataService
+            dataService,
+            CreatePermissiveAuthorization()
         );
     }
 
