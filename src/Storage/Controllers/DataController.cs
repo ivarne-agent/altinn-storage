@@ -101,7 +101,7 @@ public class DataController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The metadata of the deleted data element.</returns>
-    [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_WRITE)]
+    [Authorize]
     [HttpDelete("data/{dataGuid:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -119,6 +119,24 @@ public class DataController : ControllerBase
             string ifProcessStateVersionMatch = null
     )
     {
+        (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
+            instanceGuid,
+            instanceOwnerPartyId,
+            false,
+            cancellationToken
+        );
+
+        if (
+            await _authorizationService.AuthorizeInstanceRequest(
+                instance,
+                AuthorizationActions.Write
+            )
+            is false
+        )
+        {
+            return Forbid();
+        }
+
         (VersionPreconditions preconditions, ActionResult preconditionError) =
             VersionPreconditionHelper.TryParse(ifInstanceVersionMatch, ifProcessStateVersionMatch);
         if (preconditionError is not null)
@@ -126,12 +144,6 @@ public class DataController : ControllerBase
             return preconditionError;
         }
 
-        (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
-            instanceGuid,
-            instanceOwnerPartyId,
-            false,
-            cancellationToken
-        );
         if (instance == null)
         {
             return instanceError;
@@ -521,7 +533,7 @@ public class DataController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The metadata of the new data element.</returns>
-    [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_WRITE)]
+    [Authorize]
     [HttpPost("data")]
     [DisableFormValueModelBinding]
     [RequestSizeLimit(RequestSizeLimit)]
@@ -542,6 +554,24 @@ public class DataController : ControllerBase
             string ifProcessStateVersionMatch = null
     )
     {
+        (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
+            instanceGuid,
+            instanceOwnerPartyId,
+            false,
+            cancellationToken
+        );
+
+        if (
+            await _authorizationService.AuthorizeInstanceRequest(
+                instance,
+                AuthorizationActions.Write
+            )
+            is false
+        )
+        {
+            return Forbid();
+        }
+
         (VersionPreconditions preconditions, ActionResult preconditionError) =
             VersionPreconditionHelper.TryParse(ifInstanceVersionMatch, ifProcessStateVersionMatch);
         if (preconditionError is not null)
@@ -556,12 +586,6 @@ public class DataController : ControllerBase
             );
         }
 
-        (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
-            instanceGuid,
-            instanceOwnerPartyId,
-            false,
-            cancellationToken
-        );
         if (instance == null)
         {
             return instanceError;
@@ -685,7 +709,7 @@ public class DataController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The metadata of the updated data element.</returns>
-    [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_WRITE)]
+    [Authorize]
     [HttpPut("data/{dataGuid}")]
     [DisableFormValueModelBinding]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -707,6 +731,24 @@ public class DataController : ControllerBase
             string ifProcessStateVersionMatch = null
     )
     {
+        (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
+            instanceGuid,
+            instanceOwnerPartyId,
+            false,
+            cancellationToken
+        );
+
+        if (
+            await _authorizationService.AuthorizeInstanceRequest(
+                instance,
+                AuthorizationActions.Write
+            )
+            is false
+        )
+        {
+            return Forbid();
+        }
+
         (VersionPreconditions preconditions, ActionResult preconditionError) =
             VersionPreconditionHelper.TryParse(ifInstanceVersionMatch, ifProcessStateVersionMatch);
         if (preconditionError is not null)
@@ -721,12 +763,6 @@ public class DataController : ControllerBase
             );
         }
 
-        (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
-            instanceGuid,
-            instanceOwnerPartyId,
-            false,
-            cancellationToken
-        );
         if (instance == null)
         {
             return instanceError;
@@ -993,7 +1029,7 @@ public class DataController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The updated data element.</returns>
-    [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_WRITE)]
+    [Authorize]
     [HttpPut("dataelements/{dataGuid}")]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -1012,6 +1048,24 @@ public class DataController : ControllerBase
             string ifProcessStateVersionMatch = null
     )
     {
+        (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
+            instanceGuid,
+            instanceOwnerPartyId,
+            false,
+            cancellationToken
+        );
+
+        if (
+            await _authorizationService.AuthorizeInstanceRequest(
+                instance,
+                AuthorizationActions.Write
+            )
+            is false
+        )
+        {
+            return Forbid();
+        }
+
         (VersionPreconditions preconditions, ActionResult preconditionError) =
             VersionPreconditionHelper.TryParse(ifInstanceVersionMatch, ifProcessStateVersionMatch);
         if (preconditionError is not null)
@@ -1027,12 +1081,6 @@ public class DataController : ControllerBase
             return BadRequest("Mismatch between path and dataElement content");
         }
 
-        (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
-            instanceGuid,
-            instanceOwnerPartyId,
-            false,
-            cancellationToken
-        );
         if (instance == null)
         {
             return instanceError;
