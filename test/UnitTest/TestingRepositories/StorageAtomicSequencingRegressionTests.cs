@@ -425,7 +425,6 @@ public class StorageAtomicSequencingRegressionTests : IClassFixture<StorageAtomi
     private SignController CreateSignController(InMemoryBlobRepository blobRepository)
     {
         SigningService signingService = new(
-            _fixture.InstanceRepo,
             CreateDataService(blobRepository),
             CreateApplicationService().Object,
             CreateInstanceEventService().Object,
@@ -435,7 +434,19 @@ public class StorageAtomicSequencingRegressionTests : IClassFixture<StorageAtomi
             NullLogger<SigningService>.Instance
         );
 
-        return new SignController(signingService);
+        return new SignController(
+            signingService,
+            _fixture.InstanceRepo,
+            CreatePermissiveAuthorization()
+        );
+    }
+
+    private static IAuthorization CreatePermissiveAuthorization()
+    {
+        return Mock.Of<IAuthorization>(a =>
+            a.AuthorizeInstanceRequest(It.IsAny<InstanceInternal>(), It.IsAny<string>())
+            == Task.FromResult(true)
+        );
     }
 
     private DataService CreateDataService(InMemoryBlobRepository blobRepository)
