@@ -279,25 +279,32 @@ public class DataController : ControllerBase
         CancellationToken cancellationToken
     )
     {
-        if (instanceOwnerPartyId == 0)
-        {
-            return BadRequest("Missing parameter value: instanceOwnerPartyId can not be empty");
-        }
-
         (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
             instanceGuid,
             instanceOwnerPartyId,
             false,
             cancellationToken
         );
+
+        if (
+            await _authorizationService.AuthorizeInstanceRequest(
+                instance,
+                AuthorizationActions.Read
+            )
+            is false
+        )
+        {
+            return Forbid();
+        }
+
+        if (instanceOwnerPartyId == 0)
+        {
+            return BadRequest("Missing parameter value: instanceOwnerPartyId can not be empty");
+        }
+
         if (instance == null)
         {
             return instanceError;
-        }
-
-        if (await _authorizationService.AuthorizeInstanceRequest(instance, "read") is false)
-        {
-            return Forbid();
         }
 
         (DataElementInternal dataElement, ActionResult dataElementError) =
@@ -459,25 +466,32 @@ public class DataController : ControllerBase
         CancellationToken cancellationToken
     )
     {
-        if (instanceOwnerPartyId == 0)
-        {
-            return BadRequest("Missing parameter value: instanceOwnerPartyId can not be empty");
-        }
-
         (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
             instanceGuid,
             instanceOwnerPartyId,
             true,
             cancellationToken
         );
+
+        if (
+            await _authorizationService.AuthorizeInstanceRequest(
+                instance,
+                AuthorizationActions.Read
+            )
+            is false
+        )
+        {
+            return Forbid();
+        }
+
+        if (instanceOwnerPartyId == 0)
+        {
+            return BadRequest("Missing parameter value: instanceOwnerPartyId can not be empty");
+        }
+
         if (instance == null)
         {
             return instanceError;
-        }
-
-        if (await _authorizationService.AuthorizeInstanceRequest(instance, "read") is false)
-        {
-            return Forbid();
         }
 
         bool appOwnerRequestingElement = User.GetOrg() == instance.Org;
