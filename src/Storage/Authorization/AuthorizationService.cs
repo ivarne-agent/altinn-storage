@@ -251,7 +251,7 @@ public class AuthorizationService(
         XacmlJsonResponse response;
         if (instance is not null)
         {
-            EnrichXacmlJsonRequest(request, instance);
+            SetResourceFromInstance(request, instance);
             response = await GetDecisionForRequestWithCache(request);
         }
         else
@@ -474,7 +474,7 @@ public class AuthorizationService(
     /// <summary>
     /// Replaces the resource attributes with the instance's identity and process context so the PDP has it all.
     /// </summary>
-    public static void EnrichXacmlJsonRequest(
+    private static void SetResourceFromInstance(
         XacmlJsonRequestRoot request,
         InstanceInternal instance
     )
