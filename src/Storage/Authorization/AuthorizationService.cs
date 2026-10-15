@@ -226,10 +226,7 @@ public class AuthorizationService(
     }
 
     /// <inheritdoc />
-    public async Task<bool> AuthorizeEnrichedInstanceAction(
-        InstanceInternal instance,
-        string action
-    )
+    public async Task<bool> AuthorizeInstanceRequest(InstanceInternal instance, string action)
     {
         string org = instance.Org;
         string app = instance.AppId.Split('/')[1];
@@ -269,7 +266,7 @@ public class AuthorizationService(
         if (response?.Response == null)
         {
             _logger.LogInformation(
-                "// Authorization Helper // AuthorizeEnrichedInstanceAction failed for request: {request}.",
+                "// Authorization Helper // AuthorizeInstanceRequest failed for request: {request}.",
                 JsonSerializer.Serialize(request)
             );
             return false;

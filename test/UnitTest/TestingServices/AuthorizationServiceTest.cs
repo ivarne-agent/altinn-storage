@@ -505,15 +505,14 @@ public class AuthorizationServiceTest
     }
 
     [Fact]
-    public async Task AuthorizeEnrichedInstanceAction_ProcessEnd_IncludesEndEvent()
+    public async Task AuthorizeInstanceRequest_ProcessEnd_IncludesEndEvent()
     {
         InstanceInternal instance = CreateDomainInstance();
         instance.Process.CurrentTask = null;
         instance.Process.EndEvent = "EndEvent_1";
         List<XacmlJsonRequestRoot> requests = [];
 
-        await CreateRequestCapturingService(requests)
-            .AuthorizeEnrichedInstanceAction(instance, "read");
+        await CreateRequestCapturingService(requests).AuthorizeInstanceRequest(instance, "read");
 
         Assert.Contains(
             requests[0].Request.Resource.SelectMany(category => category.Attribute),
@@ -523,15 +522,14 @@ public class AuthorizationServiceTest
     }
 
     [Fact]
-    public async Task AuthorizeEnrichedInstanceAction_MigratedDataValues_PreservesApprovedRequestShape()
+    public async Task AuthorizeInstanceRequest_MigratedDataValues_PreservesApprovedRequestShape()
     {
         InstanceInternal instance = CreateDomainInstance();
         instance.Process = null;
         instance.DataValues = new Dictionary<string, string> { ["A2ArchRef"] = "12345" };
         List<XacmlJsonRequestRoot> requests = [];
 
-        await CreateRequestCapturingService(requests)
-            .AuthorizeEnrichedInstanceAction(instance, "read");
+        await CreateRequestCapturingService(requests).AuthorizeInstanceRequest(instance, "read");
 
         Assert.DoesNotContain(
             requests[0].Request.Resource.SelectMany(category => category.Attribute),
@@ -541,7 +539,7 @@ public class AuthorizationServiceTest
     }
 
     [Fact]
-    public async Task AuthorizeEnrichedInstanceAction_EquivalentInputsShareCacheEntry()
+    public async Task AuthorizeInstanceRequest_EquivalentInputsShareCacheEntry()
     {
         Guid instanceGuid = Guid.NewGuid();
         InstanceInternal first = CreateDomainInstance(instanceGuid);
@@ -551,8 +549,8 @@ public class AuthorizationServiceTest
         using MemoryCache cache = new(new MemoryCacheOptions());
         AuthorizationService service = CreateRequestCapturingService(requests, pdp, cache);
 
-        await service.AuthorizeEnrichedInstanceAction(first, "read");
-        await service.AuthorizeEnrichedInstanceAction(second, "read");
+        await service.AuthorizeInstanceRequest(first, "read");
+        await service.AuthorizeInstanceRequest(second, "read");
 
         Assert.Single(requests);
         pdp.Verify(

@@ -2697,7 +2697,7 @@ public class DataControllerUnitTests
 
         authorizationServiceMock
             .Setup(a =>
-                a.AuthorizeEnrichedInstanceAction(It.IsAny<InstanceInternal>(), It.IsAny<string>())
+                a.AuthorizeInstanceRequest(It.IsAny<InstanceInternal>(), It.IsAny<string>())
             )
             .ReturnsAsync(authorized);
 

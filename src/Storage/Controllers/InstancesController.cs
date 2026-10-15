@@ -276,7 +276,7 @@ public class InstancesController : ControllerBase
             return Ok(responseInstance);
         }
 
-        if (await _authorizationService.AuthorizeEnrichedInstanceAction(instance, "read") is false)
+        if (await _authorizationService.AuthorizeInstanceRequest(instance, "read") is false)
         {
             return Forbid();
         }
@@ -328,7 +328,7 @@ public class InstancesController : ControllerBase
             return Ok(responseInstance);
         }
 
-        if (await _authorizationService.AuthorizeEnrichedInstanceAction(instance, "read") is false)
+        if (await _authorizationService.AuthorizeInstanceRequest(instance, "read") is false)
         {
             return Forbid();
         }

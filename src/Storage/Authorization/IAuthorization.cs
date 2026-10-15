@@ -33,7 +33,7 @@ public interface IAuthorization
     /// <summary>
     /// Authorizes a read action on a storage instance with full process context.
     /// </summary>
-    public Task<bool> AuthorizeEnrichedInstanceAction(InstanceInternal instance, string action);
+    public Task<bool> AuthorizeInstanceRequest(InstanceInternal instance, string action);
 
     /// <summary>
     /// Authorizes that the user has one or more of the actions on a storage instance.

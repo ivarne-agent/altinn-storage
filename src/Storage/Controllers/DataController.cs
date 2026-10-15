@@ -295,7 +295,7 @@ public class DataController : ControllerBase
             return instanceError;
         }
 
-        if (await _authorizationService.AuthorizeEnrichedInstanceAction(instance, "read") is false)
+        if (await _authorizationService.AuthorizeInstanceRequest(instance, "read") is false)
         {
             return Forbid();
         }
@@ -475,7 +475,7 @@ public class DataController : ControllerBase
             return instanceError;
         }
 
-        if (await _authorizationService.AuthorizeEnrichedInstanceAction(instance, "read") is false)
+        if (await _authorizationService.AuthorizeInstanceRequest(instance, "read") is false)
         {
             return Forbid();
         }
