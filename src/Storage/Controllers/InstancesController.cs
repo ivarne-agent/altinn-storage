@@ -9,6 +9,7 @@ using System.Web;
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
 using Altinn.Common.PEP.Helpers;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.AppCaller;
 using Altinn.Platform.Storage.Clients;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
@@ -354,6 +355,7 @@ public class InstancesController : ControllerBase
     /// <!-- POST /instances?appId={appId} -->
     [Authorize]
     [HttpPost]
+    [RequireAppCallerToken]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -516,6 +518,7 @@ public class InstancesController : ControllerBase
     /// <returns>Information from the deleted instance.</returns>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_DELETE)]
     [HttpDelete("{instanceOwnerPartyId:int}/{instanceGuid:guid}")]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -659,6 +662,7 @@ public class InstancesController : ControllerBase
     /// <returns>Returns a list of the process events.</returns>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_COMPLETE)]
     [HttpPost("{instanceOwnerPartyId:int}/{instanceGuid:guid}/complete")]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -767,6 +771,7 @@ public class InstancesController : ControllerBase
     /// <returns>Returns the updated instance.</returns>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_READ)]
     [HttpPut("{instanceOwnerPartyId:int}/{instanceGuid:guid}/readstatus")]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -844,6 +849,7 @@ public class InstancesController : ControllerBase
     /// <returns>Returns the updated instance.</returns>
     [Authorize]
     [HttpPut("{instanceOwnerPartyId:int}/{instanceGuid:guid}/substatus")]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -963,6 +969,7 @@ public class InstancesController : ControllerBase
     /// <returns>The instance that was updated with an updated collection of presentation texts.</returns>
     [Authorize]
     [HttpPut("{instanceOwnerPartyId:int}/{instanceGuid:guid}/presentationtexts")]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -1072,6 +1079,7 @@ public class InstancesController : ControllerBase
     /// <returns>The instance that was updated with an updated collection of data values.</returns>
     [Authorize]
     [HttpPut("{instanceOwnerPartyId:int}/{instanceGuid:guid}/datavalues")]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

@@ -3,6 +3,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Altinn.Platform.Storage.Authorization.AppCaller;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
 using Altinn.Platform.Storage.Models;
@@ -43,6 +44,7 @@ public class SignController : ControllerBase
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_SIGN)]
     [HttpPost("{instanceOwnerPartyId:int}/{instanceGuid:guid}/sign")]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Altinn.Platform.Storage.Authorization.AppCaller;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
@@ -51,6 +52,7 @@ public class InstanceEventsController : ControllerBase
     /// <returns>The stored instance event.</returns>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_READ)]
     [HttpPost]
+    [RequireAppCallerToken]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

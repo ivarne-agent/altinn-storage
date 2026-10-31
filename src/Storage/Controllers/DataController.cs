@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.AppCaller;
 using Altinn.Platform.Storage.Clients;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
@@ -103,6 +104,7 @@ public class DataController : ControllerBase
     /// <returns>The metadata of the deleted data element.</returns>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_WRITE)]
     [HttpDelete("data/{dataGuid:guid}")]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -616,6 +618,7 @@ public class DataController : ControllerBase
     /// <returns>The metadata of the new data element.</returns>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_WRITE)]
     [HttpPost("data")]
+    [RequireAppCallerToken]
     [DisableFormValueModelBinding]
     [RequestSizeLimit(RequestSizeLimit)]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -780,6 +783,7 @@ public class DataController : ControllerBase
     /// <returns>The metadata of the updated data element.</returns>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_WRITE)]
     [HttpPut("data/{dataGuid}")]
+    [RequireAppCallerToken]
     [DisableFormValueModelBinding]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -1088,6 +1092,7 @@ public class DataController : ControllerBase
     /// <returns>The updated data element.</returns>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_WRITE)]
     [HttpPut("dataelements/{dataGuid}")]
+    [RequireAppCallerToken]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

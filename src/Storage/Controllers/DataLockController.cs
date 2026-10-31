@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.AppCaller;
 using Altinn.Platform.Storage.Extensions;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
@@ -58,6 +59,7 @@ public class DataLockController : ControllerBase
     /// <returns>DataElement that was locked</returns>
     [Authorize]
     [HttpPut]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -133,6 +135,7 @@ public class DataLockController : ControllerBase
     /// <returns>DataElement that was unlocked</returns>
     [Authorize]
     [HttpDelete]
+    [RequireAppCallerToken]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

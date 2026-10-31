@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.AppCaller;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
 using Altinn.Platform.Storage.Models;
@@ -45,6 +46,7 @@ public class InstanceLockController(
     /// <returns>The lock response with lock key if successful, or Conflict if lock is already held.</returns>
     [Authorize]
     [HttpPost]
+    [RequireAppCallerToken]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -130,6 +132,7 @@ public class InstanceLockController(
     /// <returns>NoContent if successful.</returns>
     [Authorize]
     [HttpPatch]
+    [RequireAppCallerToken]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.AppCaller;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
 using Altinn.Platform.Storage.Helpers;
@@ -100,6 +101,7 @@ public class InstanceMutationsController(
     /// <returns>The updated instance, including current blob version ids on its data elements.</returns>
     [Authorize(Policy = AuthzConstants.POLICY_INSTANCE_WRITE)]
     [HttpPost]
+    [RequireAppCallerToken]
     [DisableFormValueModelBinding]
     [RequestSizeLimit(_requestSizeLimit)]
     [Consumes("application/json", "multipart/form-data")]

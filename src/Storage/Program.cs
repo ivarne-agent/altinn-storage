@@ -15,6 +15,7 @@ using Altinn.Common.PEP.Configuration;
 using Altinn.Common.PEP.Implementation;
 using Altinn.Common.PEP.Interfaces;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.AppCaller;
 using Altinn.Platform.Storage.Clients;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
@@ -257,6 +258,8 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.Configure<PostgreSqlSettings>(config.GetSection("PostgreSqlSettings"));
     services.Configure<StorageCleanupSettings>(config.GetSection("StorageCleanupSettings"));
     services.Configure<WolverineSettings>(config.GetSection("WolverineSettings"));
+
+    services.AddAppCallerTokenValidation(config);
 
     services.AddSingleton<IAuthorizationHandler, AccessTokenHandler>();
     services.AddSingleton<IPublicSigningKeyProvider, PublicSigningKeyProvider>();

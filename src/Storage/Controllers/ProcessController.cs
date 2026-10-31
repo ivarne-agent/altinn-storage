@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.AppCaller;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
 using Altinn.Platform.Storage.Helpers;
@@ -89,6 +90,7 @@ public class ProcessController : ControllerBase
     /// <returns>The updated instance</returns>
     [Authorize]
     [HttpPut]
+    [RequireAppCallerToken]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -214,6 +216,7 @@ public class ProcessController : ControllerBase
     /// <returns></returns>
     [Authorize]
     [HttpPut("instanceandevents")]
+    [RequireAppCallerToken]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
