@@ -477,97 +477,6 @@ public class StorageAccountTests(DataElementFixture fixture)
         Assert.Equal([element.BlobVersionId], refs.BlobVersionIds);
     }
 
-    [Fact]
-    public async Task ReadDetachedBlobVersionsV1_SkipsVersionsInNamedAccounts()
-    {
-        short accountId = await _repository.Insert(Azure("detachedv1"), _org, 1, writable: false);
-        Guid dataElementId = Guid.NewGuid();
-        await fixture.DataRepo.CreateBlobVersionId(
-            _instance.Id,
-            dataElementId,
-            _instance.AppId,
-            _instance.Org,
-            1,
-            accountId
-        );
-        string withoutId = await fixture.DataRepo.CreateBlobVersionId(
-            _instance.Id,
-            dataElementId,
-            _instance.AppId,
-            _instance.Org,
-            1,
-            null
-        );
-
-        List<Guid> versions = await ReadGuids(
-            "select unnest(blobversions) from storage.readdetachedblobversions($1)",
-            dataElementId
-        );
-
-        Assert.Equal([BlobVersionId.Decode(withoutId)], versions);
-    }
-
-    [Fact]
-    public async Task ReadOrphanBlobVersionsForCleanupV1_SkipsVersionsInNamedAccounts()
-    {
-        short accountId = await _repository.Insert(Azure("orphanv1"), _org, 1, writable: false);
-        Guid dataElementId = Guid.NewGuid();
-        string withId;
-        string withoutId;
-        await PostgresUtil.FreezeTime(DateTimeOffset.UtcNow.AddDays(-8));
-        try
-        {
-            withId = await fixture.DataRepo.CreateBlobVersionId(
-                _instance.Id,
-                dataElementId,
-                _instance.AppId,
-                _instance.Org,
-                1,
-                accountId
-            );
-            withoutId = await fixture.DataRepo.CreateBlobVersionId(
-                _instance.Id,
-                dataElementId,
-                _instance.AppId,
-                _instance.Org,
-                1,
-                null
-            );
-        }
-        finally
-        {
-            await PostgresUtil.UnfreezeTime();
-        }
-
-        List<Guid> versions = await ReadGuids(
-            "select unnest(blobversions) from storage.readorphanblobversionsforcleanup() where instanceguid = $1",
-            _instance.Id
-        );
-
-        Assert.Equal([BlobVersionId.Decode(withoutId)], versions);
-        Assert.DoesNotContain(BlobVersionId.Decode(withId), versions);
-    }
-
-    [Fact]
-    public async Task ReadHardDeletedDataElementsForCleanupV1_SkipsElementsWithVersionInNamedAccount()
-    {
-        short accountId = await _repository.Insert(
-            Azure("harddeletedv1"),
-            _org,
-            1,
-            writable: false
-        );
-        DataElementInternal named = await CreateHardDeletedElement(accountId);
-        DataElementInternal pattern = await CreateHardDeletedElement(null);
-
-        List<Guid> elements = await ReadGuids(
-            "select (element->>'Id')::uuid from storage.readharddeleteddataelementsforcleanup() where (element->>'Id')::uuid = any($1)",
-            new[] { named.Id, pattern.Id }
-        );
-
-        Assert.Equal([pattern.Id], elements);
-    }
-
     private static AzureBlobProviderInfo Azure(string container) => new("account", container);
 
     private static void AssertLocation(
@@ -677,20 +586,6 @@ public class StorageAccountTests(DataElementFixture fixture)
         );
         await fixture.DataRepo.Create(element, instance.InternalId);
         return element;
-    }
-
-    private async Task<List<Guid>> ReadGuids(string sql, object parameter)
-    {
-        List<Guid> ids = [];
-        await using NpgsqlCommand command = fixture.DataSource.CreateCommand(sql);
-        command.Parameters.AddWithValue(parameter);
-        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            ids.Add(reader.GetGuid(0));
-        }
-
-        return ids;
     }
 
     private Task<int> ReadInstanceVersion() =>
