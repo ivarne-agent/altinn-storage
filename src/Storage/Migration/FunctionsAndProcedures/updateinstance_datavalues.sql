@@ -47,6 +47,6 @@ BEGIN
 
     RETURN QUERY
         SELECT 'ok'::TEXT, r.id, r.instance, r.instanceversion, r.processstateversion, r.element, r.currentblobversion
-        FROM storage.readinstance_v2(_alternateid) r;
+        FROM storage.readinstance_v3(_alternateid) r;
 END;
 $BODY$;
