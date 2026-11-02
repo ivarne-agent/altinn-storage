@@ -128,6 +128,16 @@ public sealed class FileSystemBlobProvider : IBlobStorageProvider
     }
 
     /// <inheritdoc/>
+    public Task<bool> BlobExists(
+        StorageAccount account,
+        string blobStoragePath,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.FromResult(File.Exists(ResolveBlob(account, blobStoragePath)));
+    }
+
+    /// <inheritdoc/>
     public Task<bool> DeleteBlob(StorageAccount account, string blobStoragePath)
     {
         return Task.FromResult(DeleteIfExists(ResolveBlob(account, blobStoragePath)));

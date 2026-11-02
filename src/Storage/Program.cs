@@ -376,6 +376,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<ISigningCredentialsResolver, SigningCredentialsResolver>();
     services.AddSingleton<IStorageAccountResolver, StorageAccountResolver>();
     services.AddSingleton<IStorageAccountService, StorageAccountService>();
+    services.AddSingleton<IBlobVersionRepointService, BlobVersionRepointService>();
     services.AddTransient<IDataService, DataService>();
     services.AddTransient<ISigningService, SigningService>();
     services.AddTransient<IInstanceEventService, InstanceEventService>();

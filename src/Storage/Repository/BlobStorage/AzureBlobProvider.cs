@@ -130,6 +130,31 @@ public class AzureBlobProvider(
     }
 
     /// <inheritdoc/>
+    public async Task<bool> BlobExists(
+        StorageAccount account,
+        string blobStoragePath,
+        CancellationToken cancellationToken = default
+    )
+    {
+        AzureBlobLocation location = GetLocation(account);
+        try
+        {
+            return await CreateBlobClient(location, blobStoragePath).ExistsAsync(cancellationToken);
+        }
+        catch (RequestFailedException requestFailedException)
+            when (requestFailedException.ErrorCode == _authenticationFailedErrorCode)
+        {
+            _logger.LogWarning(
+                "Authentication failed. Invalidating credentials and retrying exists operation."
+            );
+
+            InvalidateCachedClients(location);
+
+            return await CreateBlobClient(location, blobStoragePath).ExistsAsync(cancellationToken);
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<bool> DeleteBlob(StorageAccount account, string blobStoragePath)
     {
         AzureBlobLocation location = GetLocation(account);

@@ -1930,6 +1930,54 @@ END;
 $BODY$;
 
 
+-- readblobversionsforrepoint.sql:
+-- Pages through the blob versions recorded on one storage account. With _fromaccountid NULL the rows
+-- are those on the pattern default of (_org, _storageaccountnumber), where a NULL number means 1.
+-- _afterid is exclusive; pass the nil UUID to start from the beginning. Paging on the primary key keeps
+-- every page an ordered index scan.
+CREATE OR REPLACE FUNCTION storage.readblobversionsforrepoint(
+    _fromaccountid SMALLINT,
+    _org TEXT,
+    _storageaccountnumber INT,
+    _appid TEXT,
+    _afterid UUID,
+    _limit INT
+)
+    RETURNS TABLE (
+        id UUID,
+        instanceguid UUID,
+        dataelementid UUID,
+        appid TEXT,
+        blobstorageorg TEXT,
+        storageaccountnumber INT,
+        storageaccountid SMALLINT
+    )
+    LANGUAGE 'plpgsql'
+AS $BODY$
+BEGIN
+    RETURN QUERY
+        SELECT
+            bv.id,
+            bv.instanceguid,
+            bv.dataelementid,
+            bv.appid,
+            bv.blobstorageorg,
+            bv.storageaccountnumber,
+            bv.storageaccountid
+        FROM storage.dataelementblobversions bv
+        WHERE bv.id > _afterid
+            AND bv.storageaccountid IS NOT DISTINCT FROM _fromaccountid
+            AND (
+                _fromaccountid IS NOT NULL
+                OR (bv.blobstorageorg = _org AND COALESCE(bv.storageaccountnumber, 1) = _storageaccountnumber)
+            )
+            AND (_appid IS NULL OR bv.appid = _appid)
+        ORDER BY bv.id
+        LIMIT _limit;
+END;
+$BODY$;
+
+
 -- readdataelement.sql:
 CREATE OR REPLACE FUNCTION storage.readdataelement_v2(_alternateid UUID)
     RETURNS TABLE (element JSONB, currentblobversion UUID)
@@ -2599,6 +2647,28 @@ BEGIN
 		WHERE a2archivereference = _a2archivereference;
 END;
 $BODY$;
+
+-- updateblobversionaccount.sql:
+-- Records that a blob version's blob is now read from _toaccountid. The row is changed only while it
+-- still names _fromaccountid (NULL for the pattern default), so a concurrent re-point is not undone.
+-- Returns the number of rows changed, 0 or 1.
+CREATE OR REPLACE FUNCTION storage.updateblobversionaccount(_id UUID, _fromaccountid SMALLINT, _toaccountid SMALLINT)
+    RETURNS INT
+    LANGUAGE 'plpgsql'
+AS $BODY$
+DECLARE
+    _updated INT;
+BEGIN
+    UPDATE storage.dataelementblobversions
+    SET storageaccountid = _toaccountid
+    WHERE id = _id
+        AND storageaccountid IS NOT DISTINCT FROM _fromaccountid;
+
+    GET DIAGNOSTICS _updated = ROW_COUNT;
+    RETURN _updated;
+END;
+$BODY$;
+
 
 -- updatedataelement_filescanstatus.sql:
 CREATE OR REPLACE FUNCTION storage.updatedataelement_filescanstatus(

@@ -36,6 +36,13 @@ public interface IBlobStorageProvider
         CancellationToken cancellationToken = default
     );
 
+    /// <inheritdoc cref="IBlobRepository.BlobExists"/>
+    Task<bool> BlobExists(
+        StorageAccount account,
+        string blobStoragePath,
+        CancellationToken cancellationToken = default
+    );
+
     /// <inheritdoc cref="IBlobRepository.DeleteBlob"/>
     Task<bool> DeleteBlob(StorageAccount account, string blobStoragePath);
 

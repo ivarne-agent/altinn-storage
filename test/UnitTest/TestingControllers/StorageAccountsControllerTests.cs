@@ -56,6 +56,10 @@ public class StorageAccountsControllerTests(
 
     private readonly Mock<IStorageAccountRepository> _repository = CreateRepository();
     private readonly Mock<IStorageAccountResolver> _resolver = new(MockBehavior.Strict);
+    private readonly Mock<IBlobVersionRepointRepository> _repointRepository = new(
+        MockBehavior.Strict
+    );
+    private readonly Mock<IBlobRepository> _blobRepository = new(MockBehavior.Strict);
 
     [Fact]
     public async Task GetAll_ReturnsRowsWithProviderInfoDocuments()
@@ -462,6 +466,7 @@ public class StorageAccountsControllerTests(
             { "GET", $"{_basePath}/4" },
             { "POST", _basePath },
             { "PUT", $"{_basePath}/4/writable" },
+            { "POST", $"{_basePath}/repoint" },
         };
 
     [Theory]
@@ -484,6 +489,157 @@ public class StorageAccountsControllerTests(
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         VerifyNoChanges();
     }
+
+    [Fact]
+    public async Task Repoint_PatternDefault_RepointsVersionsPresentInTarget()
+    {
+        StorageAccountRow target = _azureRow with { Writable = false };
+        _repository
+            .Setup(r => r.ReadOne(target.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Rows(target));
+        Guid present = new("00000000-0000-0000-0000-000000000001");
+        Guid missing = new("00000000-0000-0000-0000-000000000002");
+        _repointRepository
+            .Setup(r =>
+                r.ReadPage(null, "ttd", 1, "ttd/app", Guid.Empty, 50, It.IsAny<CancellationToken>())
+            )
+            .ReturnsAsync([RepointRow(present), RepointRow(missing)]);
+        _blobRepository
+            .Setup(r =>
+                r.BlobExists(
+                    It.Is<StorageAccount>(a => a.Id == target.Id),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()
+                )
+            )
+            .ReturnsAsync(
+                (StorageAccount _, string path, CancellationToken _) =>
+                    path.EndsWith(BlobVersionId.Encode(present), StringComparison.Ordinal)
+            );
+        _repointRepository
+            .Setup(r => r.UpdateAccount(present, null, target.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        HttpClient client = GetClient();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            $"{_basePath}/repoint",
+            new
+            {
+                org = "ttd",
+                storageAccountNumber = 1,
+                toAccountId = target.Id,
+                appId = "ttd/app",
+                batchSize = 50,
+            }
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument body = await ReadJson(response);
+        JsonElement summary = body.RootElement;
+        Assert.False(summary.GetProperty("dryRun").GetBoolean());
+        Assert.Equal(2, summary.GetProperty("examined").GetInt32());
+        Assert.Equal(1, summary.GetProperty("repointed").GetInt32());
+        Assert.Equal(1, summary.GetProperty("missingInTarget").GetInt32());
+        Assert.Equal(missing, summary.GetProperty("missingInTargetIds")[0].GetGuid());
+        Assert.Equal(0, summary.GetProperty("alreadyMoved").GetInt32());
+        Assert.Equal(missing, summary.GetProperty("lastId").GetGuid());
+        Assert.True(summary.GetProperty("completed").GetBoolean());
+    }
+
+    public static TheoryData<string, string> InvalidRepointRequests =>
+        new()
+        {
+            { """{"org":"ttd","storageAccountNumber":1}""", "ToAccountId is required." },
+            {
+                """{"fromAccountId":4,"org":"ttd","storageAccountNumber":1,"toAccountId":3}""",
+                "Set either FromAccountId or Org and StorageAccountNumber, not both."
+            },
+            {
+                """{"fromAccountId":4,"storageAccountNumber":1,"toAccountId":3}""",
+                "Set either FromAccountId or Org and StorageAccountNumber, not both."
+            },
+            {
+                """{"toAccountId":3}""",
+                "Set either FromAccountId or Org and StorageAccountNumber."
+            },
+            {
+                """{"org":"ttd","toAccountId":3}""",
+                "Set either FromAccountId or Org and StorageAccountNumber."
+            },
+            {
+                """{"org":"ttd","storageAccountNumber":0,"toAccountId":3}""",
+                "StorageAccountNumber must be 1 or greater."
+            },
+            {
+                """{"fromAccountId":3,"toAccountId":3}""",
+                "FromAccountId and ToAccountId must differ."
+            },
+            {
+                """{"fromAccountId":4,"toAccountId":3,"batchSize":0}""",
+                "BatchSize must be between 1 and 1000."
+            },
+            {
+                """{"fromAccountId":4,"toAccountId":3,"maxBatches":101}""",
+                "MaxBatches must be between 1 and 100."
+            },
+        };
+
+    [Theory]
+    [MemberData(nameof(InvalidRepointRequests))]
+    public async Task Repoint_InvalidRequest_ReturnsBadRequestWithoutReading(
+        string json,
+        string expectedDetail
+    )
+    {
+        HttpClient client = GetClient();
+
+        HttpResponseMessage response = await client.PostAsync(
+            $"{_basePath}/repoint",
+            new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using JsonDocument body = await ReadJson(response);
+        Assert.Equal(expectedDetail, body.RootElement.GetProperty("detail").GetString());
+        VerifyNoChanges();
+    }
+
+    [Fact]
+    public async Task Repoint_UnknownTarget_ReturnsBadRequest()
+    {
+        _repository.Setup(r => r.ReadOne(9, It.IsAny<CancellationToken>())).ReturnsAsync(Rows());
+        HttpClient client = GetClient();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            $"{_basePath}/repoint",
+            new { fromAccountId = 4, toAccountId = 9 }
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using JsonDocument body = await ReadJson(response);
+        Assert.Equal(
+            "Storage account 9 does not exist.",
+            body.RootElement.GetProperty("detail").GetString()
+        );
+        VerifyNoChanges();
+    }
+
+    [Fact]
+    public async Task Repoint_WithoutToken_ReturnsUnauthorized()
+    {
+        HttpClient client = GetClient(token: null);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            $"{_basePath}/repoint",
+            new { fromAccountId = 4, toAccountId = 3 }
+        );
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        VerifyNoChanges();
+    }
+
+    private static BlobVersionRepointRow RepointRow(Guid id) =>
+        new(id, Guid.NewGuid(), Guid.NewGuid(), "ttd/app", "ttd", null, null);
 
     /// <summary>
     /// The host's startup check reads all rows, so the strict mock answers that with no rows unless
@@ -524,6 +680,29 @@ public class StorageAccountsControllerTests(
             r => r.SetWritable(It.IsAny<short>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never
         );
+        _repointRepository.Verify(
+            r =>
+                r.ReadPage(
+                    It.IsAny<short?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<int?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<int>(),
+                    It.IsAny<CancellationToken>()
+                ),
+            Times.Never
+        );
+        _repointRepository.Verify(
+            r =>
+                r.UpdateAccount(
+                    It.IsAny<Guid>(),
+                    It.IsAny<short?>(),
+                    It.IsAny<short>(),
+                    It.IsAny<CancellationToken>()
+                ),
+            Times.Never
+        );
     }
 
     private static async Task<JsonDocument> ReadJson(HttpResponseMessage response) =>
@@ -543,6 +722,8 @@ public class StorageAccountsControllerTests(
                 {
                     services.AddSingleton(_repository.Object);
                     services.AddSingleton(_resolver.Object);
+                    services.AddSingleton(_repointRepository.Object);
+                    services.AddSingleton(_blobRepository.Object);
                     services.AddSingleton<
                         IPublicSigningKeyProvider,
                         PublicSigningKeyProviderMock

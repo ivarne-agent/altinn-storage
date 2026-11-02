@@ -16,6 +16,7 @@ namespace Altinn.Platform.Storage.Controllers;
 /// Administers the storage accounts blobs are written to and read from. For operations only.
 /// </summary>
 /// <param name="storageAccountService">Manages the storage account rows.</param>
+/// <param name="repointService">Re-points blob versions between storage accounts.</param>
 [Route("storage/api/v1/admin/storageaccounts")]
 [ApiController]
 [Authorize(Policy = AuthzConstants.POLICY_SCOPE_STORAGEACCOUNTS_ADMIN)]
@@ -23,8 +24,10 @@ namespace Altinn.Platform.Storage.Controllers;
 [Produces("application/json")]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
 [ProducesResponseType(StatusCodes.Status403Forbidden)]
-public class StorageAccountsController(IStorageAccountService storageAccountService)
-    : ControllerBase
+public class StorageAccountsController(
+    IStorageAccountService storageAccountService,
+    IBlobVersionRepointService repointService
+) : ControllerBase
 {
     /// <summary>
     /// Lists all storage accounts. An account whose provider info this build cannot read is listed
@@ -143,6 +146,38 @@ public class StorageAccountsController(IStorageAccountService storageAccountServ
     {
         StorageAccountResponse? response = StorageAccountResponse.From(rows).SingleOrDefault();
         return response is null ? NotFoundProblem(id) : response;
+    }
+
+    /// <summary>
+    /// Re-points blob versions from one storage account to another after their blobs have been copied
+    /// to the target under the same paths. Each version whose blob exists in the target is recorded
+    /// on the target; the others stay on the source. Runs at most <c>maxBatches</c> pages; continue
+    /// with <c>afterId</c> set to the returned <c>lastId</c> until <c>completed</c> is true.
+    /// </summary>
+    /// <param name="request">The source, target and limits of the run.</param>
+    /// <param name="cancellationToken">CancellationToken</param>
+    /// <returns>The counts of the run.</returns>
+    [HttpPost("repoint")]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<BlobVersionRepointSummary>> Repoint(
+        [FromBody] BlobVersionRepointRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!request.TryValidate(out BlobVersionRepointJob? job, out string? error))
+        {
+            return Problem(detail: error, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        BlobVersionRepointResult result = await repointService.Repoint(job, cancellationToken);
+        if (result.Summary is null)
+        {
+            return Problem(detail: result.Error, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return result.Summary;
     }
 
     private ObjectResult NotFoundProblem(short id) =>
