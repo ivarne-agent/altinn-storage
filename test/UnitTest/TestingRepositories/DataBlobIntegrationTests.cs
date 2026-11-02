@@ -910,6 +910,164 @@ public class DataBlobIntegrationTests
         };
     }
 
+    [Fact]
+    public async Task Repoint_AfterCopyToSecondContainer_RecordsTargetAndReadsFromIt()
+    {
+        // Arrange
+        string org = $"rep{Guid.NewGuid():N}"[..12];
+        InstanceInternal instance = TestData.Instance_1_1.Clone().FromApiModel();
+        instance.Id = Guid.NewGuid();
+        instance.Org = org;
+        instance.AppId = $"{org}/test-applikasjon-1";
+        InstanceInternal created = await _dataElementFixture.InstanceRepo.Create(
+            instance,
+            CancellationToken.None
+        );
+        instance = await _dataElementFixture.InstanceRepo.GetOne(
+            created.Id,
+            false,
+            CancellationToken.None
+        );
+        int partyId = int.Parse(instance.InstanceOwner.PartyId);
+        BlobContainerClient patternContainer = await BlobRepositoryAzuriteFixture.CreateContainer(
+            string.Format(_blobFixture.Configuration.OrgStorageContainer, org)
+        );
+        string targetContainerName = $"target-{Guid.NewGuid():N}";
+        BlobContainerClient targetContainer = await BlobRepositoryAzuriteFixture.CreateContainer(
+            targetContainerName
+        );
+        Application application = new()
+        {
+            Id = instance.AppId,
+            Org = org,
+            DataTypes = [new DataType { Id = "default" }],
+        };
+        PgStorageAccountRepository accountRepository = new(_dataElementFixture.DataSource);
+        PgBlobVersionRepointRepository repointRepository = new(_dataElementFixture.DataSource);
+        BlobVersionRepointService service = new(
+            repointRepository,
+            accountRepository,
+            _blobFixture.Repository,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<BlobVersionRepointService>.Instance
+        );
+
+        try
+        {
+            DataUploadResult copied = await Upload(
+                CreateResolver(),
+                instance,
+                application,
+                "copied"
+            );
+            DataUploadResult notCopied = await Upload(
+                CreateResolver(),
+                instance,
+                application,
+                "not copied"
+            );
+            string copiedPath = copied.DataElement.BlobStoragePath;
+            BlobClient source = patternContainer.GetBlobClient(copiedPath);
+            await targetContainer
+                .GetBlobClient(copiedPath)
+                .UploadAsync((await source.DownloadContentAsync()).Value.Content);
+
+            short targetId = await accountRepository.Insert(
+                BlobRepositoryAzuriteFixture.ProviderInfo(targetContainerName),
+                org,
+                StorageAccountNaming.DefaultStorageAccountNumber,
+                writable: false
+            );
+            BlobVersionRepointJob job = new(
+                null,
+                org,
+                StorageAccountNaming.DefaultStorageAccountNumber,
+                targetId,
+                null,
+                BatchSize: 1,
+                MaxBatches: 10,
+                DryRun: true,
+                AfterId: null
+            );
+
+            // Act
+            BlobVersionRepointResult dryRun = await service.Repoint(job);
+            BlobVersionRepointResult run = await service.Repoint(job with { DryRun = false });
+            BlobVersionRepointResult rerun = await service.Repoint(job with { DryRun = false });
+
+            // Assert
+            Assert.Equal(2, dryRun.Summary.Examined);
+            Assert.Equal(1, dryRun.Summary.Repointed);
+            Assert.Equal(1, dryRun.Summary.MissingInTarget);
+            Assert.True(dryRun.Summary.Completed);
+
+            Assert.Equal(2, run.Summary.Examined);
+            Assert.Equal(1, run.Summary.Repointed);
+            Assert.Equal(1, run.Summary.MissingInTarget);
+            Assert.Equal(0, run.Summary.AlreadyMoved);
+
+            Assert.Equal(1, rerun.Summary.Examined);
+            Assert.Equal(0, rerun.Summary.Repointed);
+            Assert.Equal(1, rerun.Summary.MissingInTarget);
+
+            DataElementInternal copiedElement = await _dataElementFixture.DataRepo.Read(
+                instance.Id,
+                copied.DataElement.Id
+            );
+            DataElementInternal notCopiedElement = await _dataElementFixture.DataRepo.Read(
+                instance.Id,
+                notCopied.DataElement.Id
+            );
+            Assert.Equal(targetId, copiedElement.StorageAccountId);
+            Assert.Null(notCopiedElement.StorageAccountId);
+            Assert.Equal(
+                [BlobVersionId.Decode(notCopiedElement.BlobVersionId)],
+                run.Summary.MissingInTargetIds
+            );
+            Assert.False(
+                await repointRepository.UpdateAccount(
+                    BlobVersionId.Decode(copiedElement.BlobVersionId),
+                    null,
+                    targetId
+                )
+            );
+
+            // Without the source blob, a successful read can only come from the target container.
+            await source.DeleteAsync();
+            DataController dataController = CreateDataController(
+                CreateResolver(),
+                application,
+                org
+            );
+            Assert.Equal(
+                "copied",
+                await ReadContent(
+                    await dataController.Get(
+                        partyId,
+                        instance.Id,
+                        copied.DataElement.Id,
+                        CancellationToken.None
+                    )
+                )
+            );
+            Assert.Equal(
+                "not copied",
+                await ReadContent(
+                    await dataController.Get(
+                        partyId,
+                        instance.Id,
+                        notCopied.DataElement.Id,
+                        CancellationToken.None
+                    )
+                )
+            );
+        }
+        finally
+        {
+            await patternContainer.DeleteIfExistsAsync();
+            await targetContainer.DeleteIfExistsAsync();
+        }
+    }
+
     private IStorageAccountResolver CreateResolver() =>
         TestStorageAccounts.CreateResolver(
             new PgStorageAccountRepository(_dataElementFixture.DataSource),

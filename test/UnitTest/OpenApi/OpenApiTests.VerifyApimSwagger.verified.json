@@ -4243,6 +4243,66 @@
         }
       }
     },
+    "/admin/storageaccounts/repoint": {
+      "post": {
+        "tags": [
+          "StorageAccounts"
+        ],
+        "summary": "Re-points blob versions from one storage account to another after their blobs have been copied\nto the target under the same paths. Each version whose blob exists in the target is recorded\non the target; the others stay on the source. Runs at most `maxBatches` pages; continue\nwith `afterId` set to the returned `lastId` until `completed` is true.",
+        "requestBody": {
+          "description": "The source, target and limits of the run.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlobVersionRepointRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlobVersionRepointSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/studio/instances/{org}/{app}": {
       "get": {
         "tags": [
@@ -5116,6 +5176,114 @@
           }
         },
         "additionalProperties": false
+      },
+      "BlobVersionRepointRequest": {
+        "type": "object",
+        "properties": {
+          "fromAccountId": {
+            "type": "integer",
+            "description": "Gets or sets the storage account the versions are recorded on. Leave it out to select the\nversions on the pattern default with `org` and `storageAccountNumber`.",
+            "format": "int32",
+            "nullable": true
+          },
+          "org": {
+            "type": "string",
+            "description": "Gets or sets the blob storage org of the pattern default the versions are on.",
+            "nullable": true
+          },
+          "storageAccountNumber": {
+            "type": "integer",
+            "description": "Gets or sets the storage account number of the pattern default the versions are on, 1 or greater.\nVersions recorded without a number count as 1.",
+            "format": "int32",
+            "nullable": true
+          },
+          "toAccountId": {
+            "type": "integer",
+            "description": "Gets or sets the storage account the versions are re-pointed to.",
+            "format": "int32",
+            "nullable": true
+          },
+          "appId": {
+            "type": "string",
+            "description": "Gets or sets the application whose versions are re-pointed, or null for all of them.",
+            "nullable": true
+          },
+          "batchSize": {
+            "type": "integer",
+            "description": "Gets or sets the number of versions read per page, 1 to 1000.",
+            "format": "int32",
+            "nullable": true
+          },
+          "maxBatches": {
+            "type": "integer",
+            "description": "Gets or sets the maximum number of pages in this run, 1 to 100.",
+            "format": "int32",
+            "nullable": true
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Gets or sets whether to only count, without changing any row. Defaults to false.",
+            "nullable": true
+          },
+          "afterId": {
+            "type": "string",
+            "description": "Gets or sets the version id to continue after: the `lastId` of the previous run.",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A request to re-point blob versions from one storage account to another, after their blobs have\nbeen copied to the target under the same paths. The source is either `fromAccountId`\nor the pattern default of `org` and `storageAccountNumber`."
+      },
+      "BlobVersionRepointSummary": {
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean",
+            "description": "Gets a value indicating whether the run only counted, without changing any row."
+          },
+          "examined": {
+            "type": "integer",
+            "description": "Gets the number of versions read.",
+            "format": "int32"
+          },
+          "repointed": {
+            "type": "integer",
+            "description": "Gets the number of versions re-pointed, or in a dry run the number that would have been.",
+            "format": "int32"
+          },
+          "missingInTarget": {
+            "type": "integer",
+            "description": "Gets the number of versions left in place because their blob is not in the target account.",
+            "format": "int32"
+          },
+          "missingInTargetIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Gets the ids of the first versions counted in `missingInTarget`, at most\n100.",
+            "nullable": true
+          },
+          "alreadyMoved": {
+            "type": "integer",
+            "description": "Gets the number of versions that no longer named the source account when they were updated.",
+            "format": "int32"
+          },
+          "lastId": {
+            "type": "string",
+            "description": "Gets the id of the last version read, or the requested `afterId` when none was read; pass\nit as `afterId` to continue.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Gets a value indicating whether the run reached the last version on the source account."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The outcome of one run of re-pointing blob versions."
       },
       "CompleteConfirmation": {
         "type": "object",

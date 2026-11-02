@@ -41,6 +41,19 @@ public interface IBlobRepository
     );
 
     /// <summary>
+    /// Checks whether a blob exists.
+    /// </summary>
+    /// <param name="account">The storage account to look in.</param>
+    /// <param name="blobStoragePath">Path to the blob.</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Whether the blob exists in the account.</returns>
+    Task<bool> BlobExists(
+        StorageAccount account,
+        string blobStoragePath,
+        CancellationToken cancellationToken = default
+    );
+
+    /// <summary>
     /// Deletes a blob at the supplied concrete path.
     /// </summary>
     /// <remarks>

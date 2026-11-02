@@ -762,6 +762,15 @@ public class StorageAtomicSequencingRegressionTests : IClassFixture<StorageAtomi
             return Task.FromResult<Stream>(new MemoryStream(content));
         }
 
+        public Task<bool> BlobExists(
+            StorageAccount account,
+            string blobStoragePath,
+            CancellationToken cancellationToken = default
+        )
+        {
+            return Task.FromResult(_content.ContainsKey(Key(account, blobStoragePath)));
+        }
+
         public Task<bool> DeleteBlob(StorageAccount account, string blobStoragePath)
         {
             _content.TryRemove(Key(account, blobStoragePath), out _);

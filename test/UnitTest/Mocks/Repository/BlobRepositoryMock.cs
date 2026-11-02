@@ -29,6 +29,15 @@ public class BlobRepositoryMock : IBlobRepository
         return Task.FromResult(result);
     }
 
+    public Task<bool> BlobExists(
+        StorageAccount account,
+        string blobStoragePath,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.FromResult(File.Exists(Path.Combine(GetDataBlobPath(), blobStoragePath)));
+    }
+
     public async Task<Stream> ReadBlob(
         StorageAccount account,
         string blobStoragePath,

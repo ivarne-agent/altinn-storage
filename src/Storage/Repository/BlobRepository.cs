@@ -49,6 +49,16 @@ public class BlobRepository : IBlobRepository
     }
 
     /// <inheritdoc/>
+    public Task<bool> BlobExists(
+        StorageAccount account,
+        string blobStoragePath,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return GetProvider(account).BlobExists(account, blobStoragePath, cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public Task<bool> DeleteBlob(StorageAccount account, string blobStoragePath)
     {
         return GetProvider(account).DeleteBlob(account, blobStoragePath);

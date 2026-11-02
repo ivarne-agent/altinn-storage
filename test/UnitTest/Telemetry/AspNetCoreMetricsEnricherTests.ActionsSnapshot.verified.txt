@@ -196,6 +196,7 @@
     Altinn.Platform.Storage.Controllers.StorageAccountsController.Create (Altinn.Platform.Storage),
     Altinn.Platform.Storage.Controllers.StorageAccountsController.Get (Altinn.Platform.Storage),
     Altinn.Platform.Storage.Controllers.StorageAccountsController.GetAll (Altinn.Platform.Storage),
+    Altinn.Platform.Storage.Controllers.StorageAccountsController.Repoint (Altinn.Platform.Storage),
     Altinn.Platform.Storage.Controllers.StorageAccountsController.SetWritable (Altinn.Platform.Storage),
     Altinn.Platform.Storage.Controllers.StudioInstancesController.DeleteInstance (Altinn.Platform.Storage),
     Altinn.Platform.Storage.Controllers.StudioInstancesController.GetInstances (Altinn.Platform.Storage),
