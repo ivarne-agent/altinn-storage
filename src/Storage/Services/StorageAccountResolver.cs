@@ -29,12 +29,14 @@ public sealed class StorageAccountResolver(
     IMemoryCache memoryCache,
     IOptions<AzureStorageConfiguration> storageConfiguration,
     IOptions<GeneralSettings> generalSettings,
+    IOptions<StorageAccountSettings> settings,
     ILogger<StorageAccountResolver> logger
 ) : IStorageAccountResolver
 {
     private const string _cacheKey = "storage-accounts";
 
     private readonly AzureStorageConfiguration _storageConfiguration = storageConfiguration.Value;
+    private readonly StorageAccountSettings _settings = settings.Value;
     private readonly TimeSpan _cacheDuration = CacheDuration(
         generalSettings.Value.StorageAccountCacheSeconds
     );
@@ -163,7 +165,7 @@ public sealed class StorageAccountResolver(
     {
         return new StorageAccount(
             null,
-            StorageAccountNaming.PatternDefault(_storageConfiguration, org, number)
+            StorageAccountNaming.PatternDefault(_storageConfiguration, _settings, org, number)
         );
     }
 

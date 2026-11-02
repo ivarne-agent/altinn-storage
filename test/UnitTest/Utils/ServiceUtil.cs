@@ -63,6 +63,7 @@ public static class ServiceUtil
         services.Configure<AzureStorageConfiguration>(
             config.GetSection("AzureStorageConfiguration")
         );
+        services.Configure<StorageAccountSettings>(config.GetSection("StorageAccounts"));
         services.AddSingleton<IStorageAccountResolver, StorageAccountResolver>();
 
         return services.BuildServiceProvider();

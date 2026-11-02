@@ -34,9 +34,11 @@ public static class TestStorageAccounts
     /// </summary>
     /// <param name="repository">The storage account rows.</param>
     /// <param name="configuration">The naming pattern, or the unit test configuration.</param>
+    /// <param name="settings">The storage account settings, or the defaults.</param>
     public static StorageAccountResolver CreateResolver(
         IStorageAccountRepository? repository = null,
-        AzureStorageConfiguration? configuration = null
+        AzureStorageConfiguration? configuration = null,
+        StorageAccountSettings? settings = null
     )
     {
         return new StorageAccountResolver(
@@ -44,6 +46,7 @@ public static class TestStorageAccounts
             new MemoryCache(new MemoryCacheOptions()),
             Options.Create(configuration ?? AzureConfiguration),
             Options.Create(new GeneralSettings()),
+            Options.Create(settings ?? new StorageAccountSettings()),
             NullLogger<StorageAccountResolver>.Instance
         );
     }

@@ -347,6 +347,7 @@ public class StorageAccountTests(DataElementFixture fixture)
                 }
             ),
             Options.Create(new GeneralSettings()),
+            Options.Create(new StorageAccountSettings()),
             NullLogger<StorageAccountResolver>.Instance
         );
         Assert.Equal(

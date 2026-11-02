@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Models;
 using Altinn.Platform.Storage.Repository;
+using Altinn.Platform.Storage.Repository.BlobStorage;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
@@ -258,11 +259,13 @@ public sealed class BlobRepositoryAzuriteFixture : IAsyncLifetime
             OrgStorageContainer = $"{_containerName}-{{0}}",
         };
 
-        Repository = new BlobRepository(
-            _memoryCache,
-            Options.Create(Configuration),
-            NullLogger<BlobRepository>.Instance
-        );
+        Repository = new BlobRepository([
+            new AzureBlobProvider(
+                _memoryCache,
+                Options.Create(Configuration),
+                NullLogger<AzureBlobProvider>.Instance
+            ),
+        ]);
 
         ContainerName = string.Format(Configuration.OrgStorageContainer, Org);
         Account = new StorageAccount(null, ProviderInfo(ContainerName));

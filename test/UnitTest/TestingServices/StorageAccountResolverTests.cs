@@ -40,6 +40,7 @@ public class StorageAccountResolverTests
             new MemoryCache(new MemoryCacheOptions()),
             Options.Create(_azureConfiguration),
             Options.Create(new GeneralSettings()),
+            Options.Create(new StorageAccountSettings()),
             _logs.CreateLogger<StorageAccountResolver>()
         );
     }
@@ -55,6 +56,7 @@ public class StorageAccountResolverTests
                 new MemoryCache(new MemoryCacheOptions()),
                 Options.Create(_azureConfiguration),
                 Options.Create(new GeneralSettings { StorageAccountCacheSeconds = seconds }),
+                Options.Create(new StorageAccountSettings()),
                 _logs.CreateLogger<StorageAccountResolver>()
             )
         );

@@ -2,6 +2,7 @@
 
 using System;
 using Altinn.Platform.Storage.Repository;
+using Altinn.Platform.Storage.Repository.BlobStorage;
 using Altinn.Platform.Storage.UnitTest.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,6 +54,8 @@ public static class ServiceCollectionExtensions
             .AddSingleton<IInstanceRepository, PgInstanceRepository>()
             .AddSingleton<OutboxInsertRowFactory>()
             .AddSingleton<IInstanceMutationRepository, PgInstanceMutationRepository>()
+            .AddSingleton<IBlobStorageProvider, AzureBlobProvider>()
+            .AddSingleton<IBlobStorageProvider, FileSystemBlobProvider>()
             .AddSingleton<IBlobRepository, BlobRepository>()
             .AddSingleton<IOutboxRepository, PgOutboxRepository>()
             .AddSingleton<IInstanceLockRepository, PgInstanceLockRepository>()
