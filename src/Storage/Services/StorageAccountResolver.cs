@@ -169,6 +169,9 @@ public sealed class StorageAccountResolver(
         );
     }
 
+    /// <inheritdoc/>
+    public void Invalidate() => memoryCache.Remove(_cacheKey);
+
     private async Task<StorageAccount> ForVersion(
         short? storageAccountId,
         string blobStorageOrg,

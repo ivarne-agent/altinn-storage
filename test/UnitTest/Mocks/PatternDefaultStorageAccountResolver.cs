@@ -62,4 +62,6 @@ public class PatternDefaultStorageAccountResolver : IStorageAccountResolver
 
     public StorageAccount PatternDefault(string org, int number) =>
         _patternResolver.PatternDefault(org, number);
+
+    public void Invalidate() { }
 }
