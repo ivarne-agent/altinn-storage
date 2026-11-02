@@ -16,7 +16,9 @@ namespace Altinn.Platform.Storage.Repository;
 public class PgStorageAccountRepository(NpgsqlDataSource dataSource) : IStorageAccountRepository
 {
     private const string _readAllSql = "select * from storage.readstorageaccounts()";
+    private const string _readOneSql = "select * from storage.readstorageaccount($1)";
     private const string _insertSql = "select storage.insertstorageaccount($1, $2, $3, $4, $5)";
+    private const string _setWritableSql = "select storage.updatestorageaccountwritable($1, $2)";
 
     /// <inheritdoc/>
     public async Task<StorageAccountRows> ReadAll(CancellationToken cancellationToken = default)
@@ -27,52 +29,26 @@ public class PgStorageAccountRepository(NpgsqlDataSource dataSource) : IStorageA
         await using NpgsqlDataReader reader = await pgcom.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            short id = await reader.GetFieldValueAsync<short>("id", cancellationToken);
-            string provider = await reader.GetFieldValueAsync<string>(
-                "provider",
-                cancellationToken
-            );
-            string document = await reader.GetFieldValueAsync<string>(
-                "providerinfo",
-                cancellationToken
-            );
-            string org = await reader.GetFieldValueAsync<string>("org", cancellationToken);
-            int number = await reader.GetFieldValueAsync<int>(
-                "storageaccountnumber",
-                cancellationToken
-            );
-            bool writable = await reader.GetFieldValueAsync<bool>("writable", cancellationToken);
+            await ReadRow(reader, readable, unreadable, cancellationToken);
+        }
 
-            StorageAccountProviderInfo providerInfo;
-            try
-            {
-                providerInfo = StorageAccountProviderInfo.Deserialize(provider, document);
-            }
-            catch (Exception exception) when (exception is JsonException or NotSupportedException)
-            {
-                unreadable.Add(
-                    new UnreadableStorageAccountRow(
-                        id,
-                        provider,
-                        org,
-                        number,
-                        writable,
-                        exception.Message
-                    )
-                );
-                continue;
-            }
+        return new StorageAccountRows(readable, unreadable);
+    }
 
-            readable.Add(
-                new StorageAccountRow(
-                    id,
-                    providerInfo,
-                    org,
-                    number,
-                    writable,
-                    await reader.GetFieldValueAsync<DateTimeOffset>("created", cancellationToken)
-                )
-            );
+    /// <inheritdoc/>
+    public async Task<StorageAccountRows> ReadOne(
+        short id,
+        CancellationToken cancellationToken = default
+    )
+    {
+        List<StorageAccountRow> readable = [];
+        List<UnreadableStorageAccountRow> unreadable = [];
+        await using NpgsqlCommand pgcom = dataSource.CreateCommand(_readOneSql);
+        pgcom.Parameters.AddWithValue(NpgsqlDbType.Smallint, id);
+        await using NpgsqlDataReader reader = await pgcom.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            await ReadRow(reader, readable, unreadable, cancellationToken);
         }
 
         return new StorageAccountRows(readable, unreadable);
@@ -96,5 +72,68 @@ public class PgStorageAccountRepository(NpgsqlDataSource dataSource) : IStorageA
 
         object? id = await pgcom.ExecuteScalarAsync(cancellationToken);
         return (short)id!;
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> SetWritable(
+        short id,
+        bool writable,
+        CancellationToken cancellationToken = default
+    )
+    {
+        await using NpgsqlCommand pgcom = dataSource.CreateCommand(_setWritableSql);
+        pgcom.Parameters.AddWithValue(NpgsqlDbType.Smallint, id);
+        pgcom.Parameters.AddWithValue(NpgsqlDbType.Boolean, writable);
+
+        object? exists = await pgcom.ExecuteScalarAsync(cancellationToken);
+        return (bool)exists!;
+    }
+
+    private static async Task ReadRow(
+        NpgsqlDataReader reader,
+        List<StorageAccountRow> readable,
+        List<UnreadableStorageAccountRow> unreadable,
+        CancellationToken cancellationToken
+    )
+    {
+        short id = await reader.GetFieldValueAsync<short>("id", cancellationToken);
+        string provider = await reader.GetFieldValueAsync<string>("provider", cancellationToken);
+        string document = await reader.GetFieldValueAsync<string>(
+            "providerinfo",
+            cancellationToken
+        );
+        string org = await reader.GetFieldValueAsync<string>("org", cancellationToken);
+        int number = await reader.GetFieldValueAsync<int>(
+            "storageaccountnumber",
+            cancellationToken
+        );
+        bool writable = await reader.GetFieldValueAsync<bool>("writable", cancellationToken);
+        DateTimeOffset created = await reader.GetFieldValueAsync<DateTimeOffset>(
+            "created",
+            cancellationToken
+        );
+
+        StorageAccountProviderInfo providerInfo;
+        try
+        {
+            providerInfo = StorageAccountProviderInfo.Deserialize(provider, document);
+        }
+        catch (Exception exception) when (exception is JsonException or NotSupportedException)
+        {
+            unreadable.Add(
+                new UnreadableStorageAccountRow(
+                    id,
+                    provider,
+                    org,
+                    number,
+                    writable,
+                    created,
+                    exception.Message
+                )
+            );
+            return;
+        }
+
+        readable.Add(new StorageAccountRow(id, providerInfo, org, number, writable, created));
     }
 }

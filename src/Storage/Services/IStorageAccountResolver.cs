@@ -88,4 +88,10 @@ public interface IStorageAccountResolver
     /// <param name="number">The storage account number.</param>
     /// <returns>The storage account, without an id.</returns>
     StorageAccount PatternDefault(string org, int number);
+
+    /// <summary>
+    /// Drops the cached storage account rows, so the next lookup reads them again. Other instances of
+    /// the service see a change when their cache expires.
+    /// </summary>
+    void Invalidate();
 }

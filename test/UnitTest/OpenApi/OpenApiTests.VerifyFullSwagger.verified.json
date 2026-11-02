@@ -3987,6 +3987,251 @@
         }
       }
     },
+    "/storage/api/v1/admin/storageaccounts": {
+      "get": {
+        "tags": [
+          "StorageAccounts"
+        ],
+        "summary": "Lists all storage accounts. An account whose provider info this build cannot read is listed\nwith an error instead of its provider info.",
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StorageAccountResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "StorageAccounts"
+        ],
+        "summary": "Adds a storage account. A writable account takes the writable flag over from the current\nwritable account for the same org and storage account number, so new blob versions are written\nto it from then on.",
+        "requestBody": {
+          "description": "The storage account.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageAccountResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storage/api/v1/admin/storageaccounts/{id}": {
+      "get": {
+        "tags": [
+          "StorageAccounts"
+        ],
+        "summary": "Gets one storage account.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The storage account id.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageAccountResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storage/api/v1/admin/storageaccounts/{id}/writable": {
+      "put": {
+        "tags": [
+          "StorageAccounts"
+        ],
+        "summary": "Sets whether new blob versions for the storage account's org and storage account number are\nwritten to it. Making it writable takes the flag over from the other writable account for the pair.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The storage account id.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The writable flag.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageAccountWritableRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageAccountResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storage/api/v1/studio/instances/{org}/{app}": {
       "get": {
         "tags": [
@@ -6463,6 +6708,106 @@
         "additionalProperties": false,
         "description": "Query response object"
       },
+      "StorageAccountRequest": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "Gets or sets the provider, such as `azure-blob` or `file-system`.",
+            "nullable": true
+          },
+          "providerInfo": {
+            "type": "object",
+            "description": "Gets or sets the provider info document: the provider's own properties, such as\n`accountName` and `container` for `azure-blob`.",
+            "nullable": true
+          },
+          "org": {
+            "type": "string",
+            "description": "Gets or sets the blob storage org the account serves.",
+            "nullable": true
+          },
+          "storageAccountNumber": {
+            "type": "integer",
+            "description": "Gets or sets the application storage account number the account serves, 1 or greater.",
+            "format": "int32"
+          },
+          "writable": {
+            "type": "boolean",
+            "description": "Gets or sets whether new blob versions for the org and number are written to the account.\nDefaults to true, which takes the flag over from the current writable row for the pair.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A request to add a storage account row."
+      },
+      "StorageAccountResponse": {
+        "required": [
+          "created",
+          "id",
+          "org",
+          "provider",
+          "storageAccountNumber",
+          "writable"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Gets the row id, recorded on blob versions written to the account.",
+            "format": "int32"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Gets the provider, such as `azure-blob` or `file-system`.",
+            "nullable": true
+          },
+          "providerInfo": {
+            "type": "object",
+            "description": "Gets the provider info document: the provider's own properties. Null when this build cannot\nread it.",
+            "nullable": true
+          },
+          "org": {
+            "type": "string",
+            "description": "Gets the blob storage org the account serves.",
+            "nullable": true
+          },
+          "storageAccountNumber": {
+            "type": "integer",
+            "description": "Gets the application storage account number the account serves.",
+            "format": "int32"
+          },
+          "writable": {
+            "type": "boolean",
+            "description": "Gets whether new blob versions for the org and number are written to the account."
+          },
+          "created": {
+            "type": "string",
+            "description": "Gets when the row was created.",
+            "format": "date-time"
+          },
+          "error": {
+            "type": "string",
+            "description": "Gets why this build cannot read the provider info, or null when it can. Blob operations in\nthe account, and writes for its org and number while it is writable, fail until the row is fixed.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A storage account row. A row whose provider info this build cannot read has no provider info\nand says why in its error."
+      },
+      "StorageAccountWritableRequest": {
+        "required": [
+          "writable"
+        ],
+        "type": "object",
+        "properties": {
+          "writable": {
+            "type": "boolean",
+            "description": "Gets or sets whether new blob versions for the row's org and number are written to the account.\nSetting it takes the flag over from the other writable row for the pair."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A request to set the writable flag of a storage account row."
+      },
       "Substatus": {
         "type": "object",
         "properties": {
@@ -6679,6 +7024,9 @@
     },
     {
       "name": "Sign"
+    },
+    {
+      "name": "StorageAccounts"
     },
     {
       "name": "StudioInstances"

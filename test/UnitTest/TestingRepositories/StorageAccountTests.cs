@@ -123,6 +123,45 @@ public class StorageAccountTests(DataElementFixture fixture)
         Assert.Equal(PostgresErrorCodes.UniqueViolation, exception.SqlState);
     }
 
+    [Fact]
+    public async Task SetWritable_TakesFlagOverAndReadOneReturnsRow()
+    {
+        short first = await _repository.Insert(Azure("first"), _org, 1, writable: true);
+        short second = await _repository.Insert(Azure("second"), _org, 1, writable: false);
+        short otherNumber = await _repository.Insert(Azure("other"), _org, 2, writable: true);
+
+        Assert.True(await _repository.SetWritable(second, true));
+
+        StorageAccountRow secondRow = Assert.Single((await _repository.ReadOne(second)).Readable);
+        Assert.NotNull(secondRow);
+        Assert.Equal(Azure("second"), secondRow.ProviderInfo);
+        Assert.Equal(_org, secondRow.Org);
+        Assert.Equal(1, secondRow.StorageAccountNumber);
+        Assert.True(secondRow.Writable);
+        Assert.False(Assert.Single((await _repository.ReadOne(first)).Readable).Writable);
+        Assert.True(Assert.Single((await _repository.ReadOne(otherNumber)).Readable).Writable);
+
+        Assert.True(await _repository.SetWritable(second, true));
+        Assert.True(Assert.Single((await _repository.ReadOne(second)).Readable).Writable);
+
+        Assert.True(await _repository.SetWritable(second, false));
+        Assert.False(Assert.Single((await _repository.ReadOne(second)).Readable).Writable);
+        Assert.False(Assert.Single((await _repository.ReadOne(first)).Readable).Writable);
+    }
+
+    [Fact]
+    public async Task SetWritableAndReadOne_MissingRow_ReportMissing()
+    {
+        short missing = await PostgresUtil.RunQuery<short>(
+            "select (coalesce(max(id), 0) + 1)::smallint from storage.storageaccounts"
+        );
+
+        Assert.False(await _repository.SetWritable(missing, true));
+        StorageAccountRows rows = await _repository.ReadOne(missing);
+        Assert.Empty(rows.Readable);
+        Assert.Empty(rows.Unreadable);
+    }
+
     [Theory]
     [InlineData("unknown-provider", """{"accountName":"a","container":"c"}""")]
     [InlineData(StorageAccountProviderInfo.FileSystem, "{}")]
@@ -158,6 +197,9 @@ public class StorageAccountTests(DataElementFixture fixture)
             Assert.False(string.IsNullOrEmpty(unreadable.Error));
             Assert.StartsWith($"Storage account {id} ", unreadable.Description);
             Assert.Contains($"'{provider}'", unreadable.Description);
+            StorageAccountRows one = await _repository.ReadOne(id);
+            Assert.Empty(one.Readable);
+            Assert.Equal(unreadable, Assert.Single(one.Unreadable));
         }
         finally
         {

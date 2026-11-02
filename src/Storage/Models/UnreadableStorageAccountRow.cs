@@ -1,3 +1,5 @@
+using System;
+
 namespace Altinn.Platform.Storage.Models;
 
 /// <summary>
@@ -9,6 +11,7 @@ namespace Altinn.Platform.Storage.Models;
 /// <param name="Org">The blob storage org the account serves.</param>
 /// <param name="StorageAccountNumber">The application storage account number the account serves.</param>
 /// <param name="Writable">Whether new blob versions for the org and number are written to the account.</param>
+/// <param name="Created">When the row was inserted.</param>
 /// <param name="Error">Why the provider info could not be read.</param>
 public sealed record UnreadableStorageAccountRow(
     short Id,
@@ -16,6 +19,7 @@ public sealed record UnreadableStorageAccountRow(
     string Org,
     int StorageAccountNumber,
     bool Writable,
+    DateTimeOffset Created,
     string Error
 )
 {

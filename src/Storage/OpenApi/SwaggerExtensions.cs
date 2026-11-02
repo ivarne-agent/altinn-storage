@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
+using Newtonsoft.Json.Linq;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Swashbuckle.AspNetCore.SwaggerUI;
 
@@ -64,6 +65,7 @@ public static class SwaggerExtensions
             CompleteSwaggerDocName,
             new OpenApiInfo { Title = "Altinn Platform Storage - complete", Version = "v1" }
         );
+        c.MapType<JObject>(() => new OpenApiSchema { Type = JsonSchemaType.Object });
         c.AddServer(new() { Url = "https://platform.tt02.altinn.no", Description = "TT02" });
         c.AddServer(new() { Url = "https://platform.altinn.no", Description = "Production" });
 
