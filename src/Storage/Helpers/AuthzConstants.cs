@@ -51,4 +51,14 @@ public static class AuthzConstants
     /// Policy tag for authorizing correspondence calls to SBL bridge
     /// </summary>
     public const string POLICY_CORRESPONDENCE_SBLBRIDGE = "CorrespondenceSblBridge";
+
+    /// <summary>
+    /// Policy tag for administering storage account rows.
+    /// </summary>
+    public const string POLICY_SCOPE_STORAGEACCOUNTS_ADMIN = "ScopeStorageAccountsAdmin";
+
+    /// <summary>
+    /// The scope required to administer storage account rows.
+    /// </summary>
+    public const string SCOPE_STORAGEACCOUNTS_ADMIN = "altinn:storage/storageaccounts.admin";
 }
