@@ -56,4 +56,14 @@ public static class AuthzConstants
     /// Policy tag for calls from the file scanner, with a platform access token naming the app <c>file-scan</c>
     /// </summary>
     public const string POLICY_PLATFORM_FILE_SCAN = "PlatformFileScan";
+
+    /// <summary>
+    /// Policy tag for administering storage account rows.
+    /// </summary>
+    public const string POLICY_SCOPE_STORAGEACCOUNTS_ADMIN = "ScopeStorageAccountsAdmin";
+
+    /// <summary>
+    /// The scope required to administer storage account rows.
+    /// </summary>
+    public const string SCOPE_STORAGEACCOUNTS_ADMIN = "altinn:storage/storageaccounts.admin";
 }

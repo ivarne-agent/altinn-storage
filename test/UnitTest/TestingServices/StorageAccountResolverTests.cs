@@ -352,7 +352,16 @@ public class StorageAccountResolverTests
         string org,
         int number,
         bool writable
-    ) => new(id, "unknown-provider", org, number, writable, "The provider is not supported.");
+    ) =>
+        new(
+            id,
+            "unknown-provider",
+            org,
+            number,
+            writable,
+            DateTimeOffset.UnixEpoch,
+            "The provider is not supported."
+        );
 
     private static StorageAccountRow Row(
         short id,

@@ -324,6 +324,13 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
                 )
         )
         .AddPolicy(
+            AuthzConstants.POLICY_SCOPE_STORAGEACCOUNTS_ADMIN,
+            policy =>
+                policy.Requirements.Add(
+                    new ScopeAccessRequirement(AuthzConstants.SCOPE_STORAGEACCOUNTS_ADMIN)
+                )
+        )
+        .AddPolicy(
             "PlatformAccess",
             policy => policy.Requirements.Add(new AccessTokenRequirement())
         )
@@ -368,6 +375,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
     services.AddSingleton<IAccessTokenGenerator, AccessTokenGenerator>();
     services.AddSingleton<ISigningCredentialsResolver, SigningCredentialsResolver>();
     services.AddSingleton<IStorageAccountResolver, StorageAccountResolver>();
+    services.AddSingleton<IStorageAccountService, StorageAccountService>();
     services.AddTransient<IDataService, DataService>();
     services.AddTransient<ISigningService, SigningService>();
     services.AddTransient<IInstanceEventService, InstanceEventService>();

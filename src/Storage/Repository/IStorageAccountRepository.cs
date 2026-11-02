@@ -18,6 +18,14 @@ public interface IStorageAccountRepository
     Task<StorageAccountRows> ReadAll(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reads one storage account row.
+    /// </summary>
+    /// <param name="id">The row id.</param>
+    /// <param name="cancellationToken">CancellationToken</param>
+    /// <returns>The row in the list that matches whether this build can read it; both lists are empty when no row has the id.</returns>
+    Task<StorageAccountRows> ReadOne(short id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Inserts a storage account row. A writable row takes the writable flag over from the previous
     /// writable row for the same org and number.
     /// </summary>
@@ -34,4 +42,14 @@ public interface IStorageAccountRepository
         bool writable,
         CancellationToken cancellationToken = default
     );
+
+    /// <summary>
+    /// Sets the writable flag of a storage account row. A row made writable takes the flag over from
+    /// the other writable row for the same org and number.
+    /// </summary>
+    /// <param name="id">The row id.</param>
+    /// <param name="writable">Whether new blob versions for the org and number are written to the account.</param>
+    /// <param name="cancellationToken">CancellationToken</param>
+    /// <returns>Whether the row exists.</returns>
+    Task<bool> SetWritable(short id, bool writable, CancellationToken cancellationToken = default);
 }

@@ -14,10 +14,21 @@ public class StorageAccountRepositoryMock : IStorageAccountRepository
     public Task<StorageAccountRows> ReadAll(CancellationToken cancellationToken = default) =>
         Task.FromResult(new StorageAccountRows([], []));
 
+    public Task<StorageAccountRows> ReadOne(
+        short id,
+        CancellationToken cancellationToken = default
+    ) => Task.FromResult(new StorageAccountRows([], []));
+
     public Task<short> Insert(
         StorageAccountProviderInfo providerInfo,
         string org,
         int storageAccountNumber,
+        bool writable,
+        CancellationToken cancellationToken = default
+    ) => throw new NotSupportedException();
+
+    public Task<bool> SetWritable(
+        short id,
         bool writable,
         CancellationToken cancellationToken = default
     ) => throw new NotSupportedException();
