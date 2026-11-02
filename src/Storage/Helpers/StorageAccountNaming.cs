@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Interface.Models;
 using Altinn.Platform.Storage.Models;
@@ -25,6 +26,67 @@ public static class StorageAccountNaming
     public static int NumberOf(Application app)
     {
         return app.StorageAccountNumber ?? DefaultStorageAccountNumber;
+    }
+
+    /// <summary>
+    /// Gets the storage account that the naming pattern of the configured default provider gives for an
+    /// org and storage account number.
+    /// </summary>
+    /// <param name="config">The storage configuration holding the naming pattern.</param>
+    /// <param name="settings">The storage account settings selecting the default provider.</param>
+    /// <param name="org">The blob storage org.</param>
+    /// <param name="number">The storage account number.</param>
+    /// <returns>The provider info of the account.</returns>
+    /// <exception cref="NotSupportedException">The default provider is unknown.</exception>
+    public static StorageAccountProviderInfo PatternDefault(
+        AzureStorageConfiguration config,
+        StorageAccountSettings settings,
+        string org,
+        int number
+    )
+    {
+        return settings.DefaultProvider switch
+        {
+            StorageAccountProviderInfo.AzureBlob => PatternDefault(config, org, number),
+            StorageAccountProviderInfo.FileSystem => FileSystemPatternDefault(
+                config,
+                settings.FileSystem.RootDirectory,
+                org,
+                number
+            ),
+            _ => throw new NotSupportedException(
+                $"Storage account provider '{settings.DefaultProvider}' is not supported."
+            ),
+        };
+    }
+
+    /// <summary>
+    /// Gets the directory that the naming pattern gives for an org and storage account number.
+    /// </summary>
+    /// <param name="config">The storage configuration holding the container naming pattern.</param>
+    /// <param name="rootDirectory">The root directory of file-system storage accounts.</param>
+    /// <param name="org">The blob storage org.</param>
+    /// <param name="number">The storage account number.</param>
+    /// <returns>The provider info of the directory.</returns>
+    /// <remarks>
+    /// The folder is <see cref="AzureStorageConfiguration.OrgStorageContainer"/> formatted with the org,
+    /// with <c>-NN</c> appended when the number is not the default number, so each account the Azure
+    /// pattern distinguishes gets its own folder.
+    /// </remarks>
+    public static FileSystemProviderInfo FileSystemPatternDefault(
+        AzureStorageConfiguration config,
+        string rootDirectory,
+        string org,
+        int number
+    )
+    {
+        string folder = string.Format(config.OrgStorageContainer, org);
+        if (number != DefaultStorageAccountNumber)
+        {
+            folder = $"{folder}-{number:D2}";
+        }
+
+        return new FileSystemProviderInfo(Path.Combine(rootDirectory, folder));
     }
 
     /// <summary>

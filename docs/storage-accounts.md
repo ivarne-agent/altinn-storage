@@ -10,7 +10,7 @@ account holds its blob. This document describes how the table is used.
 ```sql
 CREATE TABLE storage.storageaccounts (
     id SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    provider TEXT NOT NULL,                 -- 'azure-blob'; selects the C# type
+    provider TEXT NOT NULL,                 -- 'azure-blob', 'file-system'; selects the C# type
     providerinfo JSONB NOT NULL,            -- that provider's own properties
     org TEXT NOT NULL,                      -- blob storage org
     storageaccountnumber INT NOT NULL,      -- Application.StorageAccountNumber, 1 when the app has none
@@ -28,10 +28,11 @@ workload identity. A document with any other key is rejected.
 | provider | providerinfo | How the service reaches it |
 | --- | --- | --- |
 | `azure-blob` | `{"accountName":"ttdaltinnprodstrg01","container":"ttd-prod-appsdata-blob-db"}` | `https://{accountName}.blob.core.windows.net/{container}` with the pod's workload identity, which needs the Storage Blob Data Contributor role on the account. The Azurite account `devstoreaccount1` uses the endpoint and shared key from `AzureStorageConfiguration`. |
+| `file-system` | `{"directory":"/data/blobs/ttd"}` | Files under the directory, which must be `StorageAccounts:FileSystem:RootDirectory` or below it, with the pod's file permissions. For local development and tests. |
 
-`azure-blob` is the only provider this release knows. A row with any other provider is unreadable
-(see [The cache](#the-cache)). The `provider` column exists so that later releases can add providers
-without changing the document format.
+A row with a provider this release does not know is unreadable (see [The cache](#the-cache)).
+Blobs in a `file-system` account cannot be read through a URL, so the file scanner cannot scan
+them; do not use the provider where file scanning is on.
 
 Rows are immutable except for `writable`. An id, once handed out, always means the same location.
 

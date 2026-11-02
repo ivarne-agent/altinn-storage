@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Models;
 using Altinn.Platform.Storage.Repository;
+using Altinn.Platform.Storage.Repository.BlobStorage;
 using Altinn.Platform.Storage.UnitTest.Fixture;
 using Azure.Core;
 using Azure.Storage;
@@ -480,13 +481,15 @@ public sealed class BlobRepositoryAzuriteFixture : IAsyncLifetime
     /// </summary>
     public BlobRepository CreateRepository(IMemoryCache memoryCache, TokenCredential credential)
     {
-        return new BlobRepository(
-            memoryCache,
-            Options.Create(Configuration),
-            NullLogger<BlobRepository>.Instance,
-            credential,
-            TestContainers.AzuriteClientOptions
-        );
+        return new BlobRepository([
+            new AzureBlobProvider(
+                memoryCache,
+                Options.Create(Configuration),
+                NullLogger<AzureBlobProvider>.Instance,
+                credential,
+                TestContainers.AzuriteClientOptions
+            ),
+        ]);
     }
 
     public string NewBlobPath(string suffix)

@@ -22,6 +22,11 @@ public abstract record StorageAccountProviderInfo
     public const string AzureBlob = "azure-blob";
 
     /// <summary>
+    /// The provider of <see cref="FileSystemProviderInfo"/>.
+    /// </summary>
+    public const string FileSystem = "file-system";
+
+    /// <summary>
     /// Gets the serializer options for provider info documents.
     /// </summary>
     /// <remarks>
@@ -61,6 +66,7 @@ public abstract record StorageAccountProviderInfo
         provider switch
         {
             AzureBlob => Deserialize<AzureBlobProviderInfo>(json),
+            FileSystem => Deserialize<FileSystemProviderInfo>(json),
             _ => throw new NotSupportedException(
                 $"Storage account provider '{provider}' is not supported."
             ),
@@ -134,4 +140,15 @@ public sealed partial record AzureBlobProviderInfo(string AccountName, string Co
 
     [GeneratedRegex(@"^[a-z0-9]+(-[a-z0-9]+)*\z")]
     private static partial Regex ContainerPattern();
+}
+
+/// <summary>
+/// A directory on a file system.
+/// </summary>
+/// <param name="Directory">The directory holding the blobs.</param>
+public sealed record FileSystemProviderInfo(string Directory) : StorageAccountProviderInfo
+{
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public override string Provider => FileSystem;
 }

@@ -81,7 +81,8 @@ public interface IStorageAccountResolver
     );
 
     /// <summary>
-    /// Gets the storage account the configured naming pattern gives for an org and storage account number.
+    /// Gets the storage account the configured naming pattern of the default provider
+    /// (<c>StorageAccounts:DefaultProvider</c>) gives for an org and storage account number.
     /// </summary>
     /// <param name="org">The blob storage org.</param>
     /// <param name="number">The storage account number.</param>

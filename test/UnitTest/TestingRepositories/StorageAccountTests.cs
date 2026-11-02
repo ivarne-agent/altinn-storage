@@ -125,7 +125,7 @@ public class StorageAccountTests(DataElementFixture fixture)
 
     [Theory]
     [InlineData("unknown-provider", """{"accountName":"a","container":"c"}""")]
-    [InlineData("file-system", """{"directory":"/data/blobs/ttd"}""")]
+    [InlineData(StorageAccountProviderInfo.FileSystem, "{}")]
     [InlineData(StorageAccountProviderInfo.AzureBlob, """{"accountName":"a"}""")]
     [InlineData(
         StorageAccountProviderInfo.AzureBlob,
@@ -347,6 +347,7 @@ public class StorageAccountTests(DataElementFixture fixture)
                 }
             ),
             Options.Create(new GeneralSettings()),
+            Options.Create(new StorageAccountSettings()),
             NullLogger<StorageAccountResolver>.Instance
         );
         Assert.Equal(

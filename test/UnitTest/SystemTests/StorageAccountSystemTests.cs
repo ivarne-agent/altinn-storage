@@ -20,6 +20,7 @@ using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
 using Altinn.Platform.Storage.Models;
 using Altinn.Platform.Storage.Repository;
+using Altinn.Platform.Storage.Repository.BlobStorage;
 using Altinn.Platform.Storage.Services;
 using Altinn.Platform.Storage.UnitTest.Fixture;
 using Altinn.Platform.Storage.UnitTest.Mocks;
@@ -586,10 +587,15 @@ public sealed class StorageAccountSystemTests : IAsyncLifetime
                 services.AddSingleton(Mock.Of<IMessageBus>());
                 services.AddSingleton(Mock.Of<IFileScanQueueClient>());
                 services.AddSingleton<IPDP, PermitAllPdp>();
-                services.AddSingleton<IBlobRepository>(provider => new BlobRepository(
+                services.Remove(
+                    services.Single(descriptor =>
+                        descriptor.ImplementationType == typeof(AzureBlobProvider)
+                    )
+                );
+                services.AddSingleton<IBlobStorageProvider>(provider => new AzureBlobProvider(
                     provider.GetRequiredService<IMemoryCache>(),
                     provider.GetRequiredService<IOptions<AzureStorageConfiguration>>(),
-                    provider.GetRequiredService<ILogger<BlobRepository>>(),
+                    provider.GetRequiredService<ILogger<AzureBlobProvider>>(),
                     new AzuriteTokenCredential(),
                     TestContainers.AzuriteClientOptions
                 ));

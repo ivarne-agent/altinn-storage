@@ -1,5 +1,6 @@
 #nullable disable
 
+using Altinn.Platform.Storage.Repository.BlobStorage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Altinn.Platform.Storage.Repository;
@@ -30,6 +31,8 @@ public static class ServiceCollectionExtensions
             .AddSingleton<IInstanceRepository, PgInstanceRepository>()
             .AddSingleton<OutboxInsertRowFactory>()
             .AddSingleton<IInstanceMutationRepository, PgInstanceMutationRepository>()
+            .AddSingleton<IBlobStorageProvider, AzureBlobProvider>()
+            .AddSingleton<IBlobStorageProvider, FileSystemBlobProvider>()
             .AddSingleton<IBlobRepository, BlobRepository>()
             .AddSingleton<IA2Repository, PgA2Repository>()
             .AddSingleton<IOutboxRepository, PgOutboxRepository>()
