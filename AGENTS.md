@@ -12,7 +12,7 @@ Altinn Storage's backend is built using the following technologies:
 - PostgreSQL, accessed via Npgsql calling **versioned stored functions/procedures** (no ORM)
 - Yuniql for database migrations (applied on application startup)
 - WolverineFx with Azure Service Bus for messaging, using an outbox pattern
-- Azure Blob Storage for data element payloads (Azurite locally)
+- Azure Blob Storage for data element payloads (Azurite locally); storage account rows can also select a file-system directory or an S3 bucket (MinIO locally)
 - Altinn.Common.PEP for XACML/PDP authorization decisions
 - OpenTelemetry with an Azure Monitor exporter for telemetry
 - Swashbuckle/Swagger for API documentation
@@ -53,7 +53,7 @@ The solution file is `Altinn.Platform.Storage.slnx` (XML-based `.slnx` format â€
 - `dotnet build Altinn.Platform.Storage.slnx` - Build the solution (also regenerates the SQL functions script via DbTools as a post-build step)
 - `dotnet run --project src/Storage` - Run the API locally at http://localhost:5010 (swagger at `/swagger`)
 - `dotnet watch --project src/Storage` - Run with hot reload
-- `docker compose up -d` - Start local infrastructure (Postgres on 5432, pgAdmin on 8888, Azurite). Usually not needed if a local Postgres instance is already running.
+- `docker compose up -d` - Start local infrastructure (Postgres on 5432, pgAdmin on 8888, Azurite, MinIO on 9000 for the S3 provider tests). Usually not needed if a local Postgres instance is already running.
 
 ### Testing
 

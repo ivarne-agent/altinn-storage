@@ -58,9 +58,9 @@ jobs:
       - name: Restart database to enable config changes
         run: |
           docker restart $(docker ps -q)
-      - name: Start Azurite
+      - name: Start Azurite and MinIO
         run: |
-          docker compose up -d --wait --wait-timeout 60 altinn_platform_storage_azurite
+          docker compose up -d --wait --wait-timeout 60 altinn_platform_storage_azurite altinn_platform_storage_minio
       - name: Install SonarCloud scanners
         run: |
           dotnet tool install --global dotnet-sonarscanner

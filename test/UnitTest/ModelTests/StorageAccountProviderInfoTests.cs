@@ -113,10 +113,10 @@ public class StorageAccountProviderInfoTests
     public void Deserialize_UnknownProvider_ThrowsNotSupported()
     {
         NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
-            StorageAccountProviderInfo.Deserialize("s3", """{"bucket":"b"}""")
+            StorageAccountProviderInfo.Deserialize("gcs", """{"bucket":"b"}""")
         );
 
-        Assert.Contains("'s3'", exception.Message);
+        Assert.Contains("'gcs'", exception.Message);
     }
 
     [Theory]

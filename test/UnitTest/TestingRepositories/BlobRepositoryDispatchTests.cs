@@ -21,13 +21,22 @@ public class BlobRepositoryDispatchTests
         StorageAccountProviderInfo.FileSystem
     );
 
+    private readonly Mock<IBlobStorageProvider> _s3Provider = CreateProvider(
+        StorageAccountProviderInfo.S3
+    );
+
     private readonly BlobRepository _repository;
 
     public BlobRepositoryDispatchTests()
     {
-        _repository = new BlobRepository([_azureProvider.Object, _fileSystemProvider.Object]);
+        _repository = new BlobRepository([
+            _azureProvider.Object,
+            _fileSystemProvider.Object,
+            _s3Provider.Object,
+        ]);
         _azureProvider.Invocations.Clear();
         _fileSystemProvider.Invocations.Clear();
+        _s3Provider.Invocations.Clear();
     }
 
     [Fact]
@@ -53,6 +62,18 @@ public class BlobRepositoryDispatchTests
     }
 
     [Fact]
+    public async Task EveryOperation_S3Account_GoesToS3Provider()
+    {
+        StorageAccount account = new(3, new S3ProviderInfo("ttd-prod-appsdata", "eu-north-1"));
+
+        await InvokeAll(account);
+
+        VerifyAll(_s3Provider, account, Times.Once());
+        VerifyAll(_azureProvider, account, Times.Never());
+        VerifyAll(_fileSystemProvider, account, Times.Never());
+    }
+
+    [Fact]
     public async Task ReadBlob_ProviderResult_IsReturned()
     {
         StorageAccount account = new(2, new FileSystemProviderInfo("/data/blobs/ttd"));
@@ -73,6 +94,7 @@ public class BlobRepositoryDispatchTests
         await AssertAllNotSupported(new StorageAccount(4, null!), string.Empty);
         _azureProvider.VerifyNoOtherCalls();
         _fileSystemProvider.VerifyNoOtherCalls();
+        _s3Provider.VerifyNoOtherCalls();
     }
 
     [Fact]
