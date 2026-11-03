@@ -27,6 +27,11 @@ public abstract record StorageAccountProviderInfo
     public const string FileSystem = "file-system";
 
     /// <summary>
+    /// The provider of <see cref="S3ProviderInfo"/>.
+    /// </summary>
+    public const string S3 = "s3";
+
+    /// <summary>
     /// Gets the serializer options for provider info documents.
     /// </summary>
     /// <remarks>
@@ -67,6 +72,7 @@ public abstract record StorageAccountProviderInfo
         {
             AzureBlob => Deserialize<AzureBlobProviderInfo>(json),
             FileSystem => Deserialize<FileSystemProviderInfo>(json),
+            S3 => Deserialize<S3ProviderInfo>(json),
             _ => throw new NotSupportedException(
                 $"Storage account provider '{provider}' is not supported."
             ),
@@ -151,4 +157,48 @@ public sealed record FileSystemProviderInfo(string Directory) : StorageAccountPr
     /// <inheritdoc/>
     [JsonIgnore]
     public override string Provider => FileSystem;
+}
+
+/// <summary>
+/// A bucket in Amazon S3 or an S3-compatible service. The document names only the bucket and its
+/// region; the endpoint and the credentials come from <c>StorageAccounts:S3</c> in configuration, so a
+/// document cannot point the repository, or its credentials, at any other host.
+/// </summary>
+/// <param name="Bucket">
+/// The bucket name: 3 to 63 lowercase letters, digits, dots and hyphens, starting and ending with a
+/// letter or digit.
+/// </param>
+/// <param name="Region">The region of the bucket, such as <c>eu-north-1</c>.</param>
+/// <exception cref="ArgumentException">The bucket or the region is not valid.</exception>
+public sealed partial record S3ProviderInfo(string Bucket, string Region)
+    : StorageAccountProviderInfo
+{
+    /// <summary>
+    /// Gets the bucket name.
+    /// </summary>
+    public string Bucket { get; } =
+        Bucket is { Length: >= 3 and <= 63 } && BucketPattern().IsMatch(Bucket)
+            ? Bucket
+            : throw new ArgumentException(
+                $"'{Bucket}' is not a valid S3 bucket name.",
+                nameof(Bucket)
+            );
+
+    /// <summary>
+    /// Gets the region of the bucket.
+    /// </summary>
+    public string Region { get; } =
+        Region is not null && RegionPattern().IsMatch(Region)
+            ? Region
+            : throw new ArgumentException($"'{Region}' is not a valid S3 region.", nameof(Region));
+
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public override string Provider => S3;
+
+    [GeneratedRegex(@"^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\z")]
+    private static partial Regex BucketPattern();
+
+    [GeneratedRegex(@"^[a-z0-9-]+\z")]
+    private static partial Regex RegionPattern();
 }

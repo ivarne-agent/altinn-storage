@@ -105,7 +105,7 @@ public class StorageAccountProviderInfoTests
     }
 
     [Theory]
-    [InlineData("s3", """{"bucket":"b"}""")]
+    [InlineData("gcs", """{"bucket":"b"}""")]
     public void Deserialize_UnknownProvider_ThrowsNotSupported(string provider, string json)
     {
         NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>

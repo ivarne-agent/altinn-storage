@@ -12,7 +12,7 @@ Altinn Storage's backend is built using the following technologies:
 - PostgreSQL, accessed via Npgsql calling **versioned stored functions/procedures** (no ORM)
 - Yuniql for database migrations (applied on application startup)
 - WolverineFx with Azure Service Bus for messaging, using an outbox pattern
-- Azure Blob Storage for data element payloads (Azurite locally)
+- Azure Blob Storage for data element payloads (Azurite locally); storage account rows can also select a file-system directory or an S3 bucket (MinIO locally)
 - Altinn.Common.PEP for XACML/PDP authorization decisions
 - OpenTelemetry with an Azure Monitor exporter for telemetry
 - Swashbuckle/Swagger for API documentation
@@ -53,7 +53,7 @@ The solution file is `Altinn.Platform.Storage.slnx` (XML-based `.slnx` format â€
 - `dotnet build Altinn.Platform.Storage.slnx` - Build the solution (also regenerates the SQL functions script via DbTools as a post-build step)
 - `dotnet run --project src/Storage` - Run the API locally at http://localhost:5010 (swagger at `/swagger`)
 - `dotnet watch --project src/Storage` - Run with hot reload
-- `docker compose up -d` - Start local infrastructure for running the API (Postgres on 5432, pgAdmin on 8888, Azurite). The tests don't use it.
+- `docker compose up -d` - Start local infrastructure for running the API (Postgres on 5432, pgAdmin on 8888, Azurite, MinIO on 9000 for the S3 provider). The tests don't use it.
 
 ### Testing
 
@@ -75,7 +75,7 @@ The solution file is `Altinn.Platform.Storage.slnx` (XML-based `.slnx` format â€
 
 ## Testing Guidelines
 
-- Most repository, controller, and service tests are **DB-backed**. The tests start PostgreSQL and Azurite containers through Testcontainers (`test/UnitTest/Fixture/TestContainers.cs`) on first use, so they need a running Docker or Podman but no other setup; every run starts from an empty database. Build configuration for tests with `ServiceUtil.AddTestSettings()`, which points `appsettings.unittest.json` at the containers. Controller tests using mocked repositories (e.g. the `GetInstances` query-endpoint tests) don't start the containers unless they build that configuration.
+- Most repository, controller, and service tests are **DB-backed**. The tests start PostgreSQL, Azurite and MinIO containers through Testcontainers (`test/UnitTest/Fixture/TestContainers.cs`) on first use, so they need a running Docker or Podman but no other setup; every run starts from an empty database. Build configuration for tests with `ServiceUtil.AddTestSettings()`, which points `appsettings.unittest.json` at the containers. Controller tests using mocked repositories (e.g. the `GetInstances` query-endpoint tests) don't start the containers unless they build that configuration.
 - Mock external dependencies using `Moq`
 - Follow the Arrange, Act, Assert pattern
 - Place test files in the same folder structure as the source files

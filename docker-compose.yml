@@ -67,3 +67,20 @@ services:
       - "10002:10002"
     networks:
       - altinnplatform_network
+
+  altinn_platform_storage_minio:
+    image: bitnamilegacy/minio:2025.7.23
+    container_name: storage_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: [ "CMD", "mc", "ready", "local" ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    ports:
+      - "9000:9000"
+    networks:
+      - altinnplatform_network

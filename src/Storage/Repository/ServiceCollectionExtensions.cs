@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
             .AddSingleton<IInstanceMutationRepository, PgInstanceMutationRepository>()
             .AddSingleton<IBlobStorageProvider, AzureBlobProvider>()
             .AddSingleton<IBlobStorageProvider, FileSystemBlobProvider>()
+            .AddSingleton<IBlobStorageProvider, S3BlobProvider>()
             .AddSingleton<IBlobRepository, BlobRepository>()
             .AddSingleton<IA2Repository, PgA2Repository>()
             .AddSingleton<IOutboxRepository, PgOutboxRepository>()

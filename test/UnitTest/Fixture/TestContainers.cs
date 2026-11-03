@@ -17,9 +17,10 @@ using Testcontainers.PostgreSql;
 namespace Altinn.Platform.Storage.UnitTest.Fixture;
 
 /// <summary>
-/// The PostgreSQL and Azurite containers the tests run against. They are started on first use, shared
-/// by the whole test run and removed by Testcontainers when the run ends, so every run starts from an
-/// empty database that the migrations in the working tree are applied to.
+/// The PostgreSQL, Azurite and MinIO containers the tests run against. They are started on first use,
+/// shared by the whole test run and removed by Testcontainers when the run ends, so every run starts
+/// from an empty database that the migrations in the working tree are applied to. MinIO is started
+/// separately, by the first test that uses S3.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -51,9 +52,15 @@ public static class TestContainers
         "mcr.microsoft.com/azure-storage/azurite:3.37.0@sha256:830430c1da1a2d537e08f3e6764dd1f5ae00cf0346bcaf625b968ec3f0971fd5";
     private const string _postgresAdminUser = "platform_storage_admin";
     private const string _postgresPassword = "Password";
+    private const string _minioImage =
+        "bitnamilegacy/minio:2025.7.23@sha256:8935e75fa5d11295c17171e4aa49efe390a1193cd7f12e4d21b92af9ffef09d7";
+    private const string _minioUser = "minioadmin";
+    private const string _minioPassword = "minioadmin";
     private const ushort _azuriteBlobPort = 10000;
+    private const ushort _minioPort = 9000;
 
     private static readonly Lazy<Endpoints> _endpoints = new(Start);
+    private static readonly Lazy<string> _minioServiceUrl = new(StartMinio);
 
     /// <summary>
     /// Gets the Azurite blob endpoint of the development account.
@@ -69,6 +76,12 @@ public static class TestContainers
     /// Gets the settings that point the configuration in appsettings.unittest.json at the containers.
     /// </summary>
     public static IReadOnlyDictionary<string, string?> Settings => _endpoints.Value.Settings;
+
+    /// <summary>
+    /// Gets the S3 endpoint of MinIO, whose access key and secret key are both <c>minioadmin</c>, as in
+    /// appsettings.unittest.json.
+    /// </summary>
+    public static string MinioServiceUrl => _minioServiceUrl.Value;
 
     /// <summary>
     /// Creates an HTTP client that trusts Azurite's certificate, for requests without the Azure SDK.
@@ -159,6 +172,28 @@ public static class TestContainers
                 ["AzureStorageConfiguration:BlobEndPoint"] = azuriteBlobEndpoint,
             }
         );
+    }
+
+    private static string StartMinio()
+    {
+        IContainer minio = new ContainerBuilder(_minioImage)
+            .WithEnvironment("MINIO_ROOT_USER", _minioUser)
+            .WithEnvironment("MINIO_ROOT_PASSWORD", _minioPassword)
+            .WithPortBinding(_minioPort, true)
+            // The image starts MinIO once for its setup and stops it again before the real start, which
+            // alone logs the API address; the health check alone would pass during the setup.
+            .WithWaitStrategy(
+                Wait.ForUnixContainer()
+                    .UntilMessageIsLogged("API: http")
+                    .UntilHttpRequestIsSucceeded(request =>
+                        request.ForPort(_minioPort).ForPath("/minio/health/ready")
+                    )
+            )
+            .Build();
+
+        minio.StartAsync().GetAwaiter().GetResult();
+
+        return $"http://{minio.Hostname}:{minio.GetMappedPublicPort(_minioPort)}";
     }
 
     private static HttpClientHandler CreateAzuriteHandler(string certificateThumbprint)
