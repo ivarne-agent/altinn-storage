@@ -30,12 +30,34 @@ public sealed class FileSystemBlobProviderTests : IDisposable
         _provider = CreateProvider(_root);
     }
 
+    private readonly string _outside = Path.Combine(
+        Path.GetTempPath(),
+        "file-system-blobs-outside",
+        Guid.NewGuid().ToString("N")
+    );
+
     public void Dispose()
     {
-        if (Directory.Exists(_root))
+        // A root that is itself a symbolic link is removed as a link, leaving its target to the
+        // outside cleanup below.
+        if (new DirectoryInfo(_root).LinkTarget is not null)
+        {
+            Directory.Delete(_root);
+        }
+        else if (Directory.Exists(_root))
         {
             Directory.Delete(_root, recursive: true);
         }
+
+        if (Directory.Exists(_outside))
+        {
+            Directory.Delete(_outside, recursive: true);
+        }
+    }
+
+    private string CreateOutsideDirectory()
+    {
+        return Directory.CreateDirectory(_outside).FullName;
     }
 
     [Fact]
@@ -202,6 +224,122 @@ public sealed class FileSystemBlobProviderTests : IDisposable
         }
 
         Assert.False(Directory.Exists(sibling));
+    }
+
+    [Fact]
+    public async Task EveryOperation_SymlinkedDirectoryPointingOutsideRoot_Throws()
+    {
+        string outside = CreateOutsideDirectory();
+        string linked = Path.Combine(_root, "linked-account");
+        Directory.CreateDirectory(_root);
+        Directory.CreateSymbolicLink(linked, outside);
+        StorageAccount account = new(8, new FileSystemProviderInfo(linked));
+
+        Func<Task>[] operations =
+        [
+            () => _provider.WriteBlob(account, new MemoryStream([1]), "ttd/app/blob"),
+            () => _provider.ReadBlob(account, "ttd/app/blob"),
+            () => _provider.DeleteBlob(account, "ttd/app/blob"),
+            () => _provider.DeleteBlobsIfExists(account, ["ttd/app/blob"]),
+            () => _provider.DeleteDataBlobs(account, "ttd/app", Guid.NewGuid()),
+        ];
+
+        foreach (Func<Task> operation in operations)
+        {
+            ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(operation);
+            Assert.Contains("is not under the file-system root directory", exception.Message);
+            Assert.Contains($"(resolved: '{outside}'", exception.Message);
+        }
+
+        Assert.Empty(Directory.GetFileSystemEntries(outside));
+    }
+
+    [Fact]
+    public async Task WriteAndReadBlob_SymlinkedSubdirectoryPointingOutsideAccount_Throws()
+    {
+        string outside = CreateOutsideDirectory();
+        await File.WriteAllTextAsync(Path.Combine(outside, "secret"), "secret");
+        Directory.CreateDirectory(Path.Combine(_directory, "ttd"));
+        Directory.CreateSymbolicLink(Path.Combine(_directory, "ttd", "app"), outside);
+
+        ArgumentException write = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _provider.WriteBlob(_account, new MemoryStream([1]), "ttd/app/new/blob")
+        );
+        ArgumentException read = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _provider.ReadBlob(_account, "ttd/app/secret")
+        );
+
+        Assert.StartsWith("Blob path escapes the storage account directory", write.Message);
+        Assert.Contains($"(resolved: '{Path.Combine(outside, "new", "blob")}')", write.Message);
+        Assert.StartsWith("Blob path escapes the storage account directory", read.Message);
+        Assert.Contains($"(resolved: '{Path.Combine(outside, "secret")}')", read.Message);
+        Assert.Equal([Path.Combine(outside, "secret")], Directory.GetFileSystemEntries(outside));
+    }
+
+    [Fact]
+    public async Task WriteAndReadBlob_BlobFileIsSymlink_Throws()
+    {
+        string target = NewBlobPath("data-elements/target");
+        string linked = NewBlobPath("data-elements/linked");
+        await Write(target, "target");
+        string linkedFile = Path.Combine(_directory, linked);
+        Directory.CreateDirectory(Path.GetDirectoryName(linkedFile)!);
+        File.CreateSymbolicLink(linkedFile, Path.Combine(_directory, target));
+
+        ArgumentException write = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _provider.WriteBlob(_account, new MemoryStream([1]), linked)
+        );
+        ArgumentException read = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _provider.ReadBlob(_account, linked)
+        );
+
+        Assert.StartsWith("Blob path is a symbolic link", write.Message);
+        Assert.StartsWith("Blob path is a symbolic link", read.Message);
+        Assert.Equal("target", await File.ReadAllTextAsync(Path.Combine(_directory, target)));
+    }
+
+    [Fact]
+    public async Task WriteAndReadBlob_SymlinksPointingInsideRoot_Succeed()
+    {
+        string real = Path.Combine(_root, "real-account");
+        string linkedAccount = Path.Combine(_root, "linked-account");
+        Directory.CreateDirectory(Path.Combine(real, "ttd", "shared"));
+        Directory.CreateSymbolicLink(linkedAccount, real);
+        Directory.CreateSymbolicLink(Path.Combine(real, "ttd", "app"), "shared");
+        StorageAccount account = new(8, new FileSystemProviderInfo(linkedAccount));
+
+        await _provider.WriteBlob(
+            account,
+            new MemoryStream(Encoding.UTF8.GetBytes("inside")),
+            "ttd/app/blob"
+        );
+        await using Stream? read = await _provider.ReadBlob(account, "ttd/app/blob");
+
+        Assert.Equal(
+            "inside",
+            await File.ReadAllTextAsync(Path.Combine(real, "ttd", "shared", "blob"))
+        );
+        Assert.NotNull(read);
+        using StreamReader reader = new(read);
+        Assert.Equal("inside", await reader.ReadToEndAsync());
+    }
+
+    [Fact]
+    public async Task WriteBlob_RootDirectoryIsSymlink_WritesThroughIt()
+    {
+        string realRoot = CreateOutsideDirectory();
+        Directory.CreateDirectory(Path.GetDirectoryName(_root)!);
+        Directory.CreateSymbolicLink(_root, realRoot);
+        string blobStoragePath = NewBlobPath("blob");
+
+        await Write(blobStoragePath, "through the root link");
+
+        Assert.Equal(
+            "through the root link",
+            await File.ReadAllTextAsync(
+                Path.Combine(realRoot, "ttd-dev-appsdata-blob-db", blobStoragePath)
+            )
+        );
     }
 
     [Fact]
