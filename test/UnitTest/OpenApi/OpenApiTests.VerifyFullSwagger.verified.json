@@ -4026,7 +4026,7 @@
         "tags": [
           "StorageAccounts"
         ],
-        "summary": "Adds a storage account. A writable account takes the writable flag over from the current\nwritable account for the same org and storage account number, so new blob versions are written\nto it from then on.",
+        "summary": "Adds a storage account. A writable account takes the writable flag over from the current\nwritable account for the same org and storage account number, so new blob versions are written\nto it from then on. A concurrent hand-over for the same pair answers 409 Conflict; retry it.",
         "requestBody": {
           "description": "The storage account.",
           "content": {
@@ -4070,6 +4070,16 @@
           },
           "400": {
             "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -4148,7 +4158,7 @@
         "tags": [
           "StorageAccounts"
         ],
-        "summary": "Sets whether new blob versions for the storage account's org and storage account number are\nwritten to it. Making it writable takes the flag over from the other writable account for the pair.",
+        "summary": "Sets whether new blob versions for the storage account's org and storage account number are\nwritten to it. Making it writable takes the flag over from the other writable account for the pair;\na concurrent hand-over for the same pair answers 409 Conflict, so retry it.",
         "parameters": [
           {
             "name": "id",
@@ -4214,6 +4224,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {

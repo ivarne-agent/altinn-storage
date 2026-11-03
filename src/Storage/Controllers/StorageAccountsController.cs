@@ -62,7 +62,7 @@ public class StorageAccountsController(IStorageAccountService storageAccountServ
     /// <summary>
     /// Adds a storage account. A writable account takes the writable flag over from the current
     /// writable account for the same org and storage account number, so new blob versions are written
-    /// to it from then on.
+    /// to it from then on. A concurrent hand-over for the same pair answers 409 Conflict; retry it.
     /// </summary>
     /// <param name="request">The storage account.</param>
     /// <param name="cancellationToken">CancellationToken</param>
@@ -71,6 +71,7 @@ public class StorageAccountsController(IStorageAccountService storageAccountServ
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<StorageAccountResponse>> Create(
         [FromBody] StorageAccountRequest request,
         CancellationToken cancellationToken
@@ -81,19 +82,29 @@ public class StorageAccountsController(IStorageAccountService storageAccountServ
             return Problem(detail: error, statusCode: StatusCodes.Status400BadRequest);
         }
 
-        StorageAccountRow row = await storageAccountService.Create(
-            providerInfo,
-            request.Org!,
-            request.StorageAccountNumber,
-            request.Writable ?? true,
-            cancellationToken
-        );
+        StorageAccountRow row;
+        try
+        {
+            row = await storageAccountService.Create(
+                providerInfo,
+                request.Org!,
+                request.StorageAccountNumber,
+                request.Writable ?? true,
+                cancellationToken
+            );
+        }
+        catch (StorageAccountWritableConflictException exception)
+        {
+            return ConflictProblem(exception);
+        }
+
         return CreatedAtAction(nameof(Get), new { id = row.Id }, StorageAccountResponse.From(row));
     }
 
     /// <summary>
     /// Sets whether new blob versions for the storage account's org and storage account number are
-    /// written to it. Making it writable takes the flag over from the other writable account for the pair.
+    /// written to it. Making it writable takes the flag over from the other writable account for the pair;
+    /// a concurrent hand-over for the same pair answers 409 Conflict, so retry it.
     /// </summary>
     /// <param name="id">The storage account id.</param>
     /// <param name="request">The writable flag.</param>
@@ -104,17 +115,27 @@ public class StorageAccountsController(IStorageAccountService storageAccountServ
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<StorageAccountResponse>> SetWritable(
         short id,
         [FromBody] StorageAccountWritableRequest request,
         CancellationToken cancellationToken
     )
     {
-        StorageAccountRows rows = await storageAccountService.SetWritable(
-            id,
-            request.Writable!.Value,
-            cancellationToken
-        );
+        StorageAccountRows rows;
+        try
+        {
+            rows = await storageAccountService.SetWritable(
+                id,
+                request.Writable!.Value,
+                cancellationToken
+            );
+        }
+        catch (StorageAccountWritableConflictException exception)
+        {
+            return ConflictProblem(exception);
+        }
+
         return SingleOrNotFound(id, rows);
     }
 
@@ -129,4 +150,7 @@ public class StorageAccountsController(IStorageAccountService storageAccountServ
             detail: $"Storage account {id} does not exist.",
             statusCode: StatusCodes.Status404NotFound
         );
+
+    private ObjectResult ConflictProblem(StorageAccountWritableConflictException exception) =>
+        Problem(detail: exception.Message, statusCode: StatusCodes.Status409Conflict);
 }

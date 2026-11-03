@@ -125,6 +125,38 @@ public class StorageAccountTests(DataElementFixture fixture)
     }
 
     [Fact]
+    public async Task Insert_ConcurrentWritableHandOver_SecondViolatesWritableIndex()
+    {
+        await using NpgsqlConnection first = await fixture.DataSource.OpenConnectionAsync();
+        await using NpgsqlTransaction transaction = await first.BeginTransactionAsync();
+        await using (
+            NpgsqlCommand insert = new(
+                "select storage.insertstorageaccount('azure-blob', '{\"accountName\":\"account\",\"container\":\"first\"}', $1, 1, true)",
+                first,
+                transaction
+            )
+        )
+        {
+            insert.Parameters.AddWithValue(_org);
+            await insert.ExecuteScalarAsync();
+        }
+
+        Task<short> second = _repository.Insert(Azure("second"), _org, 1, writable: true);
+        await WaitUntilBlockedBy(first.ProcessID, second);
+        await transaction.CommitAsync();
+
+        PostgresException exception = await Assert.ThrowsAsync<PostgresException>(() => second);
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, exception.SqlState);
+        Assert.Equal("storageaccounts_writable", exception.ConstraintName);
+        StorageAccountRow row = Assert.Single(
+            (await _repository.ReadAll()).Readable,
+            row => row.Org == _org
+        );
+        Assert.Equal(Azure("first"), row.ProviderInfo);
+        Assert.True(row.Writable);
+    }
+
+    [Fact]
     public async Task SetWritable_TakesFlagOverAndReadOneReturnsRow()
     {
         short first = await _repository.Insert(Azure("first"), _org, 1, writable: true);
@@ -611,6 +643,28 @@ public class StorageAccountTests(DataElementFixture fixture)
     }
 
     private static AzureBlobProviderInfo Azure(string container) => new("account", container);
+
+    /// <summary>
+    /// Waits until a backend waits for a lock the backend with the given process id holds, so the
+    /// statement under test has taken its snapshot before the blocking transaction commits.
+    /// </summary>
+    private static async Task WaitUntilBlockedBy(int processId, Task statement)
+    {
+        for (int attempt = 0; attempt < 200 && !statement.IsCompleted; attempt++)
+        {
+            long blocked = await PostgresUtil.RunQuery<long>(
+                $"select count(*) from pg_stat_activity where {processId} = any(pg_blocking_pids(pid))"
+            );
+            if (blocked > 0)
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        Assert.Fail("The second insert never waited for the first transaction.");
+    }
 
     private static void AssertLocation(
         DataElementInternal element,
