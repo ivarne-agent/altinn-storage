@@ -35,6 +35,7 @@ public interface IStorageAccountService
     /// <param name="writable">Whether new blob versions for the org and number are written to the account.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The new row.</returns>
+    /// <exception cref="StorageAccountWritableConflictException">A concurrent hand-over made another row for the org and number writable.</exception>
     Task<StorageAccountRow> Create(
         StorageAccountProviderInfo providerInfo,
         string org,
@@ -51,6 +52,7 @@ public interface IStorageAccountService
     /// <param name="writable">Whether new blob versions for the org and number are written to the account.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The updated row in the list that matches whether this build can read it; both lists are empty when no row has the id.</returns>
+    /// <exception cref="StorageAccountWritableConflictException">A concurrent hand-over made another row for the org and number writable.</exception>
     Task<StorageAccountRows> SetWritable(
         short id,
         bool writable,

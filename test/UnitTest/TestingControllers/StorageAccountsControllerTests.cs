@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
+using Npgsql;
 using Wolverine;
 using Xunit;
 
@@ -373,6 +374,78 @@ public class StorageAccountsControllerTests(
     }
 
     [Fact]
+    public async Task Post_ConcurrentWritableHandOver_ReturnsConflict()
+    {
+        FileSystemProviderInfo expected = new("/data/blobs/ttd");
+        _repository
+            .Setup(r => r.Insert(expected, "ttd", 2, true, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(UniqueViolation("storageaccounts_writable"));
+        HttpClient client = GetClient();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            _basePath,
+            new
+            {
+                provider = "file-system",
+                providerInfo = new { directory = "/data/blobs/ttd" },
+                org = "ttd",
+                storageAccountNumber = 2,
+            }
+        );
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using JsonDocument body = await ReadJson(response);
+        Assert.Equal(409, body.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal(
+            "Another writable storage account for org 'ttd' number 2 was set at the same time; retry.",
+            body.RootElement.GetProperty("detail").GetString()
+        );
+        _resolver.Verify(r => r.Invalidate(), Times.Never);
+    }
+
+    [Fact]
+    public async Task PutWritable_ConcurrentWritableHandOver_ReturnsConflict()
+    {
+        _repository
+            .Setup(r => r.SetWritable(4, true, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(UniqueViolation("storageaccounts_writable"));
+        _repository
+            .Setup(r => r.ReadOne(4, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Rows(_fileSystemRow));
+        HttpClient client = GetClient();
+
+        HttpResponseMessage response = await client.PutAsJsonAsync(
+            $"{_basePath}/4/writable",
+            new { writable = true }
+        );
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using JsonDocument body = await ReadJson(response);
+        Assert.Equal(
+            "Another writable storage account for org 'ttd' number 2 was set at the same time; retry.",
+            body.RootElement.GetProperty("detail").GetString()
+        );
+        _resolver.Verify(r => r.Invalidate(), Times.Never);
+    }
+
+    [Fact]
+    public async Task PutWritable_OtherUniqueViolation_ReturnsInternalServerError()
+    {
+        _repository
+            .Setup(r => r.SetWritable(4, true, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(UniqueViolation("storageaccounts_pkey"));
+        HttpClient client = GetClient();
+
+        HttpResponseMessage response = await client.PutAsJsonAsync(
+            $"{_basePath}/4/writable",
+            new { writable = true }
+        );
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        _resolver.Verify(r => r.Invalidate(), Times.Never);
+    }
+
+    [Fact]
     public async Task GetAll_WithoutToken_ReturnsUnauthorized()
     {
         HttpClient client = GetClient(token: null);
@@ -417,6 +490,15 @@ public class StorageAccountsControllerTests(
     /// a test sets up rows of its own.
     /// </summary>
     private static StorageAccountRows Rows(params StorageAccountRow[] rows) => new(rows, []);
+
+    private static PostgresException UniqueViolation(string constraintName) =>
+        new(
+            "duplicate key value violates unique constraint",
+            "ERROR",
+            "ERROR",
+            PostgresErrorCodes.UniqueViolation,
+            constraintName: constraintName
+        );
 
     private static Mock<IStorageAccountRepository> CreateRepository()
     {
