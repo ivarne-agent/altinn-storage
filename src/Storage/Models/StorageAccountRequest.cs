@@ -11,7 +11,7 @@ namespace Altinn.Platform.Storage.Models;
 public sealed class StorageAccountRequest
 {
     /// <summary>
-    /// Gets or sets the provider, such as <c>azure-blob</c> or <c>file-system</c>.
+    /// Gets or sets the provider, such as <c>azure-blob</c>.
     /// </summary>
     public string? Provider { get; set; }
 

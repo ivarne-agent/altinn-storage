@@ -45,9 +45,9 @@ public class StorageAccountsControllerTests(
         _created
     );
 
-    private static readonly StorageAccountRow _fileSystemRow = new(
+    private static readonly StorageAccountRow _readOnlyRow = new(
         4,
-        new FileSystemProviderInfo("/data/blobs/ttd"),
+        new AzureBlobProviderInfo("ttdaltinndatastrg02", "data2"),
         "ttd",
         2,
         false,
@@ -62,7 +62,7 @@ public class StorageAccountsControllerTests(
     {
         _repository
             .Setup(r => r.ReadAll(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Rows(_azureRow, _fileSystemRow));
+            .ReturnsAsync(Rows(_azureRow, _readOnlyRow));
         HttpClient client = GetClient();
 
         HttpResponseMessage response = await client.GetAsync(_basePath);
@@ -86,13 +86,13 @@ public class StorageAccountsControllerTests(
         Assert.Equal(1, azure.GetProperty("storageAccountNumber").GetInt32());
         Assert.True(azure.GetProperty("writable").GetBoolean());
         Assert.Equal(_created, azure.GetProperty("created").GetDateTimeOffset());
-        JsonElement fileSystem = body.RootElement[1];
-        Assert.Equal("file-system", fileSystem.GetProperty("provider").GetString());
+        JsonElement readOnly = body.RootElement[1];
+        Assert.Equal("azure-blob", readOnly.GetProperty("provider").GetString());
         Assert.Equal(
-            "/data/blobs/ttd",
-            fileSystem.GetProperty("providerInfo").GetProperty("directory").GetString()
+            "ttdaltinndatastrg02",
+            readOnly.GetProperty("providerInfo").GetProperty("accountName").GetString()
         );
-        Assert.False(fileSystem.GetProperty("writable").GetBoolean());
+        Assert.False(readOnly.GetProperty("writable").GetBoolean());
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class StorageAccountsControllerTests(
     {
         _repository
             .Setup(r => r.ReadOne(4, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Rows(_fileSystemRow));
+            .ReturnsAsync(Rows(_readOnlyRow));
         HttpClient client = GetClient();
 
         HttpResponseMessage response = await client.GetAsync($"{_basePath}/4");
@@ -225,7 +225,7 @@ public class StorageAccountsControllerTests(
     [Fact]
     public async Task Post_NotWritable_InsertsReadOnlyRow()
     {
-        FileSystemProviderInfo expected = new("/data/blobs/ttd");
+        AzureBlobProviderInfo expected = new("ttdaltinndatastrg02", "data2");
         _repository
             .Setup(r => r.Insert(expected, "ttd", 2, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync((short)6);
@@ -239,8 +239,8 @@ public class StorageAccountsControllerTests(
             _basePath,
             new
             {
-                provider = "file-system",
-                providerInfo = new { directory = "/data/blobs/ttd" },
+                provider = "azure-blob",
+                providerInfo = new { accountName = "ttdaltinndatastrg02", container = "data2" },
                 org = "ttd",
                 storageAccountNumber = 2,
                 writable = false,
@@ -258,6 +258,10 @@ public class StorageAccountsControllerTests(
             {
                 """{"provider":"s3","providerInfo":{"bucket":"b"},"org":"ttd","storageAccountNumber":1}""",
                 "Storage account provider 's3' is not supported."
+            },
+            {
+                """{"provider":"file-system","providerInfo":{"directory":"/data/blobs/ttd"},"org":"ttd","storageAccountNumber":1}""",
+                "Storage account provider 'file-system' is not supported."
             },
             {
                 """{"provider":"azure-blob","providerInfo":{"accountName":"a"},"org":"ttd","storageAccountNumber":1}""",
@@ -284,11 +288,11 @@ public class StorageAccountsControllerTests(
                 "StorageAccountNumber must be 1 or greater."
             },
             {
-                """{"providerInfo":{"directory":"/d"},"org":"ttd","storageAccountNumber":1}""",
+                """{"providerInfo":{"accountName":"a","container":"c"},"org":"ttd","storageAccountNumber":1}""",
                 "Provider is required."
             },
             {
-                """{"provider":"file-system","org":"ttd","storageAccountNumber":1}""",
+                """{"provider":"azure-blob","org":"ttd","storageAccountNumber":1}""",
                 "ProviderInfo is required."
             },
         };
@@ -323,7 +327,7 @@ public class StorageAccountsControllerTests(
             .ReturnsAsync(true);
         _repository
             .Setup(r => r.ReadOne(4, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Rows(_fileSystemRow with { Writable = writable }));
+            .ReturnsAsync(Rows(_readOnlyRow with { Writable = writable }));
         _resolver.Setup(r => r.Invalidate());
         HttpClient client = GetClient();
 
@@ -376,7 +380,7 @@ public class StorageAccountsControllerTests(
     [Fact]
     public async Task Post_ConcurrentWritableHandOver_ReturnsConflict()
     {
-        FileSystemProviderInfo expected = new("/data/blobs/ttd");
+        AzureBlobProviderInfo expected = new("ttdaltinndatastrg02", "data2");
         _repository
             .Setup(r => r.Insert(expected, "ttd", 2, true, It.IsAny<CancellationToken>()))
             .ThrowsAsync(UniqueViolation("storageaccounts_writable"));
@@ -386,8 +390,8 @@ public class StorageAccountsControllerTests(
             _basePath,
             new
             {
-                provider = "file-system",
-                providerInfo = new { directory = "/data/blobs/ttd" },
+                provider = "azure-blob",
+                providerInfo = new { accountName = "ttdaltinndatastrg02", container = "data2" },
                 org = "ttd",
                 storageAccountNumber = 2,
             }
@@ -411,7 +415,7 @@ public class StorageAccountsControllerTests(
             .ThrowsAsync(UniqueViolation("storageaccounts_writable"));
         _repository
             .Setup(r => r.ReadOne(4, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Rows(_fileSystemRow));
+            .ReturnsAsync(Rows(_readOnlyRow));
         HttpClient client = GetClient();
 
         HttpResponseMessage response = await client.PutAsJsonAsync(

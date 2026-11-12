@@ -6733,7 +6733,7 @@
         "properties": {
           "provider": {
             "type": "string",
-            "description": "Gets or sets the provider, such as `azure-blob` or `file-system`.",
+            "description": "Gets or sets the provider, such as `azure-blob`.",
             "nullable": true
           },
           "providerInfo": {
@@ -6778,7 +6778,7 @@
           },
           "provider": {
             "type": "string",
-            "description": "Gets the provider, such as `azure-blob` or `file-system`.",
+            "description": "Gets the provider, such as `azure-blob`.",
             "nullable": true
           },
           "providerInfo": {

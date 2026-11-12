@@ -23,7 +23,7 @@ public sealed class StorageAccountResponse
     public required short Id { get; init; }
 
     /// <summary>
-    /// Gets the provider, such as <c>azure-blob</c> or <c>file-system</c>.
+    /// Gets the provider, such as <c>azure-blob</c>.
     /// </summary>
     public required string Provider { get; init; }
 
