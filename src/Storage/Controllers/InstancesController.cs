@@ -135,9 +135,7 @@ public class InstancesController : ControllerBase
             return scopeProblem.ToResult();
         }
 
-        bool hasSyncAdapterScope = _authorizationService.UserHasRequiredScope(
-            _generalSettings.InstanceSyncAdapterScope
-        );
+        bool hasSyncAdapterScope = _authorizationService.HasSyncAdapterScope();
 
         if (await AuthorizeCaller(queryParameters, hasSyncAdapterScope) is { } authResult)
         {
@@ -1537,9 +1535,7 @@ public class InstancesController : ControllerBase
     private ActionResult<Instance> GetInstanceResponse(InstanceInternal instance)
     {
         Instance mappedInstance = instance.ToApiModel();
-        bool isSyncAdapter = _authorizationService.UserHasRequiredScope([
-            _generalSettings.InstanceSyncAdapterScope,
-        ]);
+        bool isSyncAdapter = _authorizationService.HasSyncAdapterScope();
         if (User.GetOrg() != instance.Org && !isSyncAdapter)
         {
             FilterOutDeletedDataElements(mappedInstance);

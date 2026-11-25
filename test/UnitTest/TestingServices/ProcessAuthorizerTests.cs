@@ -66,6 +66,13 @@ public class ProcessAuthorizerTests
                 new ClaimsPrincipal(new ClaimsIdentity([new Claim(AltinnCoreClaimTypes.Org, org)]))
             );
 
+    private void SetupCallerScope(string scope) =>
+        _claimsPrincipalProviderMock
+            .Setup(p => p.GetUser())
+            .Returns(
+                new ClaimsPrincipal(new ClaimsIdentity([new Claim("urn:altinn:scope", scope)]))
+            );
+
     private void VerifyPdpNeverAsked() =>
         _authorizationMock.Verify(
             a =>
@@ -472,9 +479,7 @@ public class ProcessAuthorizerTests
     public async Task AuthorizeDataValuesUpdate_SyncAdapterScope_ReturnsTrue()
     {
         var instance = new InstanceInternal { Process = new ProcessState { CurrentTask = null } };
-        _authorizationMock
-            .Setup(a => a.UserHasRequiredScope("altinn:storage/instances.syncadapter"))
-            .Returns(true);
+        SetupCallerScope("altinn:storage/instances.syncadapter");
 
         Assert.Null(await CreateSut().AuthorizeDataValuesUpdate(instance));
     }
@@ -483,9 +488,7 @@ public class ProcessAuthorizerTests
     public async Task AuthorizePresentationTextsUpdate_SyncAdapterScope_ReturnsFalse()
     {
         var instance = new InstanceInternal { Process = new ProcessState { CurrentTask = null } };
-        _authorizationMock
-            .Setup(a => a.UserHasRequiredScope("altinn:storage/instances.syncadapter"))
-            .Returns(true);
+        SetupCallerScope("altinn:storage/instances.syncadapter");
 
         Assert.Equal(
             StatusCodes.Status403Forbidden,
@@ -493,13 +496,31 @@ public class ProcessAuthorizerTests
         );
     }
 
+    [Theory]
+    [InlineData("altinn:storage/instances.syncadapterX")]
+    [InlineData("ALTINN:STORAGE/INSTANCES.SYNCADAPTER")]
+    public async Task AuthorizeDataValuesUpdate_ScopeOnlyContainingSyncAdapterScope_AsksPdp(
+        string scope
+    )
+    {
+        var instance = CreateInstance(altinnTaskType: "data");
+        SetupCallerScope(scope);
+        // The PDP must be asked even where a substring match of the scope would succeed.
+        _authorizationMock.Setup(a => a.UserHasRequiredScope(It.IsAny<string>())).Returns(true);
+        SetupAuthorizeAction("write", "Task_1", true);
+
+        Assert.Null(await CreateSut().AuthorizeDataValuesUpdate(instance));
+        _authorizationMock.Verify(
+            a => a.AuthorizeInstanceAction(instance, "write", "Task_1"),
+            Times.Once
+        );
+    }
+
     [Fact]
     public async Task AuthorizeUpdate_NoSyncAdapterScope_NoActions_ReturnsFalse()
     {
         var instance = CreateInstance(altinnTaskType: "data");
-        _authorizationMock
-            .Setup(a => a.UserHasRequiredScope("altinn:storage/instances.syncadapter"))
-            .Returns(false);
+        SetupCallerScope("altinn:storage/instances.read");
 
         Assert.Equal(
             StatusCodes.Status403Forbidden,

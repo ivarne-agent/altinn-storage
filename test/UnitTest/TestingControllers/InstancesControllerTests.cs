@@ -271,6 +271,73 @@ public class InstancesControllerTests : IAsyncLifetime
         Assert.Equal("1337", instance.InstanceOwner.PartyId);
     }
 
+    [Theory]
+    [InlineData("altinn:storage/instances.syncadapterX")]
+    [InlineData("ALTINN:STORAGE/INSTANCES.SYNCADAPTER")]
+    public async Task Get_One_ScopeOnlyContainingSyncAdapterScope_HidesHardDeletedDataElements(
+        string scope
+    )
+    {
+        // Arrange
+        Guid instanceGuid = Guid.Parse("377efa97-80ee-4cc6-8d48-09de12cc273d");
+        Guid visibleDataId = Guid.NewGuid();
+        InstanceInternal instance = new()
+        {
+            Id = instanceGuid,
+            InstanceOwner = new InstanceOwner { PartyId = "1337" },
+            AppId = "tdd/endring-av-navn",
+            Org = "tdd",
+            Process = new ProcessState
+            {
+                CurrentTask = new ProcessElementInfo
+                {
+                    ElementId = "Task_1",
+                    AltinnTaskType = "data",
+                },
+            },
+            Status = new InstanceStatus(),
+            Versions = new StorageVersions(1, 1),
+            Data =
+            [
+                new DataElementInternal
+                {
+                    Id = visibleDataId,
+                    InstanceGuid = instanceGuid,
+                    DataType = "default",
+                },
+                new DataElementInternal
+                {
+                    Id = Guid.NewGuid(),
+                    InstanceGuid = instanceGuid,
+                    DataType = "default",
+                    DeleteStatus = new DeleteStatus
+                    {
+                        IsHardDeleted = true,
+                        HardDeleted = new DateTime(2026, 7, 11, 12, 0, 0, DateTimeKind.Utc),
+                    },
+                },
+            ],
+        };
+        Mock<IInstanceRepository> repository = new();
+        repository
+            .Setup(r => r.GetOne(instanceGuid, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(instance);
+
+        HttpClient client = GetTestClient(repository);
+        string token = PrincipalUtil.GetToken(3, 1337, 3, scopes: [scope]);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Act
+        HttpResponseMessage response = await client.GetAsync($"{BasePath}/1337/{instanceGuid}");
+
+        // Assert
+        string responseContent = await response.Content.ReadAsStringAsync();
+        Assert.True(response.StatusCode == HttpStatusCode.OK, responseContent);
+        Instance result = JsonConvert.DeserializeObject<Instance>(responseContent);
+        DataElement data = Assert.Single(result.Data);
+        Assert.Equal(visibleDataId.ToString(), data.Id);
+    }
+
     [Fact]
     public async Task GetByGuid_One_With_SyncAdapterScope_Ok()
     {
@@ -1534,6 +1601,37 @@ public class InstancesControllerTests : IAsyncLifetime
         Assert.Equal(expectedNoInstances, queryResponse.Count);
     }
 
+    /// <summary>
+    /// Test case: A user whose token has a scope that only contains the sync adapter scope requests the
+    /// instances of a party they represent.
+    /// Expected: The search is filtered by the PDP as for any other user.
+    /// </summary>
+    [Theory]
+    [InlineData("altinn:storage/instances.syncadapterX")]
+    [InlineData("ALTINN:STORAGE/INSTANCES.SYNCADAPTER")]
+    public async Task GetMany_ScopeOnlyContainingSyncAdapterScope_FiltersByPdp(string scope)
+    {
+        // Arrange
+        string requestUri = $"{BasePath}?instanceOwner.partyId=1600";
+
+        HttpClient client = GetTestClient();
+        string token = PrincipalUtil.GetToken(3, 1337, scopes: [scope]);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        int expectedNoInstances = 3;
+
+        // Act
+        HttpResponseMessage response = await client.GetAsync(requestUri);
+        string json = await response.Content.ReadAsStringAsync();
+        QueryResponse<Instance> queryResponse = JsonConvert.DeserializeObject<
+            QueryResponse<Instance>
+        >(json);
+
+        // Assert
+        Assert.True(response.StatusCode == HttpStatusCode.OK, json);
+        Assert.Equal(expectedNoInstances, queryResponse.Count);
+    }
+
     [Fact]
     public async Task GetMany_DomainQuery_AuthorizesThenMapsAndShapesExactPublicInstanceJson()
     {
@@ -1607,9 +1705,7 @@ public class InstancesControllerTests : IAsyncLifetime
                 }
             );
         Mock<IAuthorization> authorization = new();
-        authorization
-            .Setup(service => service.UserHasRequiredScope(It.IsAny<string>()))
-            .Returns(false);
+        authorization.Setup(service => service.HasSyncAdapterScope()).Returns(false);
         authorization
             .Setup(service => service.AuthorizeInstances(It.IsAny<List<InstanceInternal>>()))
             .ReturnsAsync(([authorizedInstance], null));
@@ -1723,9 +1819,7 @@ public class InstancesControllerTests : IAsyncLifetime
             )
             .ReturnsAsync(new InstanceQueryResult { Instances = [instance] });
         Mock<IAuthorization> authorization = new(MockBehavior.Strict);
-        authorization
-            .Setup(service => service.UserHasRequiredScope("altinn:storage/instances.syncadapter"))
-            .Returns(syncAdapter);
+        authorization.Setup(service => service.HasSyncAdapterScope()).Returns(syncAdapter);
 
         HttpClient client = GetTestClient(repository, authorizationService: authorization);
         string token = syncAdapter
@@ -1795,9 +1889,7 @@ public class InstancesControllerTests : IAsyncLifetime
             )
             .ReturnsAsync(new InstanceQueryResult { Exception = "request cancelled" });
         Mock<IAuthorization> authorization = new();
-        authorization
-            .Setup(service => service.UserHasRequiredScope(It.IsAny<string>()))
-            .Returns(false);
+        authorization.Setup(service => service.HasSyncAdapterScope()).Returns(false);
         InstancesController controller = new(
             repository.Object,
             repository.Object,

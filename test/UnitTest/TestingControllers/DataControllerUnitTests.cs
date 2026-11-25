@@ -935,7 +935,7 @@ public class DataControllerUnitTests
         Guid instanceGuid = Guid.NewGuid();
         BlobVersionReadFixture fixture = CreateBlobVersionReadFixture(instanceGuid);
         fixture.HttpContext.User = CreateOrgPrincipal("ttd");
-        fixture.Authorization.Setup(a => a.UserHasRequiredScope(It.IsAny<string>())).Returns(true);
+        fixture.Authorization.Setup(a => a.HasSyncAdapterScope()).Returns(true);
         fixture
             .Authorization.Setup(a =>
                 a.AuthorizeInstanceRequest(It.IsAny<InstanceInternal>(), "read")

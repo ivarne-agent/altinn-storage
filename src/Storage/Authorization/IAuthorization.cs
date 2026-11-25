@@ -174,6 +174,13 @@ public interface IAuthorization
     public bool UserHasRequiredScope(string requiredScope);
 
     /// <summary>
+    /// Whether the current user's token has the configured sync adapter scope as one of its scopes,
+    /// compared as a whole value and with case, as <see cref="Scopes.ApiScopeRules.HasScope"/> does.
+    /// </summary>
+    /// <returns>true if the current user has the sync adapter scope.</returns>
+    public bool HasSyncAdapterScope();
+
+    /// <summary>
     /// Sends in a request and get response with result of the request
     /// </summary>
     /// <param name="xacmlJsonRequest">The Xacml Json Request</param>

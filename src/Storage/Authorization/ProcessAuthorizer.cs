@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
@@ -83,7 +84,12 @@ public class ProcessAuthorizer : IProcessAuthorizer
 
     private Task<ProblemDetails?> AuthorizeWithSyncAdapterBypass(InstanceInternal instance)
     {
-        if (_authorizationService.UserHasRequiredScope(_generalSettings.InstanceSyncAdapterScope))
+        if (
+            ApiScopeRules.HasScope(
+                _claimsPrincipalProvider.GetUser(),
+                _generalSettings.InstanceSyncAdapterScope
+            )
+        )
         {
             return Task.FromResult<ProblemDetails?>(null);
         }

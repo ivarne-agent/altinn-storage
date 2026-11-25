@@ -1514,10 +1514,7 @@ public class DataController : ControllerBase
     /// </summary>
     private async Task<ProblemDetails> AuthorizeBlobVersionRead(InstanceInternal instance)
     {
-        if (
-            User.GetOrg() != instance.Org
-            || _authorizationService.UserHasRequiredScope(_generalSettings.InstanceSyncAdapterScope)
-        )
+        if (User.GetOrg() != instance.Org || _authorizationService.HasSyncAdapterScope())
         {
             return AuthorizationProblems.Forbidden();
         }

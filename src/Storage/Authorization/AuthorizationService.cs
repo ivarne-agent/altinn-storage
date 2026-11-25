@@ -965,7 +965,8 @@ public class AuthorizationService(
         return HasSyncAdapterScope();
     }
 
-    private bool HasSyncAdapterScope() =>
+    /// <inheritdoc />
+    public bool HasSyncAdapterScope() =>
         ApiScopeRules.HasScope(
             _claimsPrincipalProvider.GetUser(),
             _settings.InstanceSyncAdapterScope
