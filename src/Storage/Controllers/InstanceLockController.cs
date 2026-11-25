@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
 using Altinn.Platform.Storage.Models;
@@ -20,14 +21,14 @@ namespace Altinn.Platform.Storage.Controllers;
 /// <remarks>
 /// Initializes a new instance of the <see cref="InstanceLockController"/> class
 /// </remarks>
-/// <param name="instanceRepository">the instance repository handler</param>
+/// <param name="authorizationService">gets the instance, with the party and scope checks</param>
 /// <param name="instanceLockRepository">the instance lock repository</param>
 /// <param name="processAuthorizer">the process authorizer</param>
 /// <param name="logger">the logger</param>
 [Route("storage/api/v1/instances/{instanceOwnerPartyId:int}/{instanceGuid:guid}/lock")]
 [ApiController]
 public class InstanceLockController(
-    IInstanceRepository instanceRepository,
+    IAuthorization authorizationService,
     IInstanceLockRepository instanceLockRepository,
     IProcessAuthorizer processAuthorizer,
     ILogger<InstanceLockController> logger
@@ -43,6 +44,7 @@ public class InstanceLockController(
     /// <param name="request">The lock request containing expiration time.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The lock response with lock key if successful, or Conflict if lock is already held.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPost]
     [Consumes("application/json")]
@@ -84,28 +86,17 @@ public class InstanceLockController(
             );
         }
 
-        InstanceInternal instance = await instanceRepository.GetOne(
-            instanceGuid,
-            false,
-            cancellationToken
-        );
-
-        if (instance is null || instance.InstanceOwner.PartyId != instanceOwnerPartyId.ToString())
-        {
-            return Problem(
-                detail: "Instance not found.",
-                statusCode: StatusCodes.Status404NotFound
+        (InstanceInternal? instance, ProblemDetails? problem) =
+            await authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                i => AuthorizeAcquireLock(i, instanceOwnerPartyId),
+                includeElements: false,
+                cancellationToken
             );
-        }
-
-        if (await processAuthorizer.AuthorizeInstanceLock(instance) is { } lockProblem)
+        if (instance is null)
         {
-            if (lockProblem.Status == StatusCodes.Status403Forbidden)
-            {
-                lockProblem.Detail = "Not authorized to acquire instance lock.";
-            }
-
-            return lockProblem.ToResult();
+            return problem!.ToResult();
         }
 
         var (result, lockToken) = await instanceLockRepository.TryAcquireLock(
@@ -137,6 +128,7 @@ public class InstanceLockController(
     /// <param name="lockTokenHeader">The lock token used for authorizing access to the lock.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>NoContent if successful.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPatch]
     [Consumes("application/json")]
@@ -176,18 +168,18 @@ public class InstanceLockController(
             );
         }
 
-        InstanceInternal instance = await instanceRepository.GetOne(
-            instanceGuid,
-            false,
-            cancellationToken
-        );
-
-        if (instance is null || instance.InstanceOwner.PartyId != instanceOwnerPartyId.ToString())
-        {
-            return Problem(
-                detail: "Instance not found.",
-                statusCode: StatusCodes.Status404NotFound
+        // The lock token authorizes the update. The instance must belong to the route's party.
+        (InstanceInternal? instance, ProblemDetails? problem) =
+            await authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                i => Task.FromResult(AuthorizeRouteParty(i, instanceOwnerPartyId)),
+                includeElements: false,
+                cancellationToken
             );
+        if (instance is null)
+        {
+            return problem!.ToResult();
         }
 
         var result = await instanceLockRepository.TryUpdateLockExpiration(
@@ -214,5 +206,38 @@ public class InstanceLockController(
             ),
             _ => throw new UnreachableException(),
         };
+    }
+
+    /// <summary>
+    /// The lock endpoints require the instance to belong to the route's party, whatever the mode of the
+    /// party check in <see cref="IAuthorization.GetAuthorizedInstance(int, Guid, string, bool, CancellationToken)"/>.
+    /// </summary>
+    private static ProblemDetails? AuthorizeRouteParty(
+        InstanceInternal instance,
+        int instanceOwnerPartyId
+    )
+    {
+        return instance.InstanceOwner.PartyId == instanceOwnerPartyId.ToString()
+            ? null
+            : AuthorizationProblems.Forbidden();
+    }
+
+    private async Task<ProblemDetails?> AuthorizeAcquireLock(
+        InstanceInternal instance,
+        int instanceOwnerPartyId
+    )
+    {
+        if (AuthorizeRouteParty(instance, instanceOwnerPartyId) is { } problem)
+        {
+            return problem;
+        }
+
+        ProblemDetails? lockProblem = await processAuthorizer.AuthorizeInstanceLock(instance);
+        if (lockProblem?.Status == StatusCodes.Status403Forbidden)
+        {
+            lockProblem.Detail = "Not authorized to acquire instance lock.";
+        }
+
+        return lockProblem;
     }
 }

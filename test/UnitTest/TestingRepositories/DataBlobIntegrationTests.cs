@@ -287,7 +287,6 @@ public class DataBlobIntegrationTests
         DataController dataController = new(
             _dataElementFixture.DataRepo,
             _blobFixture.Repository,
-            _dataElementFixture.InstanceRepo,
             _dataElementFixture.InstanceMutationRepo,
             applicationRepository.Object,
             dataService,

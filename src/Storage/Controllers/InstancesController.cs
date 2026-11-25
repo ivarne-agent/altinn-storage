@@ -9,6 +9,7 @@ using System.Web;
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
 using Altinn.Common.PEP.Helpers;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Clients;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
@@ -38,7 +39,9 @@ namespace Altinn.Platform.Storage.Controllers;
 [ApiController]
 public class InstancesController : ControllerBase
 {
-    private readonly IInstanceRepository _instanceRepository;
+    private readonly IInstanceWriteRepository _instanceRepository;
+    private readonly IInstanceQueryRepository _instanceQueryRepository;
+    private readonly IInstanceScopeAuthorizer _scopeAuthorizer;
     private readonly IPartiesWithInstancesClient _partiesWithInstancesClient;
     private readonly ILogger _logger;
     private readonly IAuthorization _authorizationService;
@@ -53,6 +56,7 @@ public class InstancesController : ControllerBase
     /// Initializes a new instance of the <see cref="InstancesController"/> class
     /// </summary>
     /// <param name="instanceRepository">the instance repository handler</param>
+    /// <param name="instanceQueryRepository">the instance search</param>
     /// <param name="partiesWithInstancesClient">An implementation of <see cref="IPartiesWithInstancesClient"/> that can be used to send information to SBL.</param>
     /// <param name="logger">the logger</param>
     /// <param name="authorizationService">the authorization service.</param>
@@ -61,8 +65,10 @@ public class InstancesController : ControllerBase
     /// <param name="applicationService">the application service.</param>
     /// <param name="settings">the general settings.</param>
     /// <param name="processAuthorizer">the process authorizer.</param>
+    /// <param name="scopeAuthorizer">checks the API scopes of instantiation and search.</param>
     public InstancesController(
-        IInstanceRepository instanceRepository,
+        IInstanceWriteRepository instanceRepository,
+        IInstanceQueryRepository instanceQueryRepository,
         IPartiesWithInstancesClient partiesWithInstancesClient,
         ILogger<InstancesController> logger,
         IAuthorization authorizationService,
@@ -70,10 +76,13 @@ public class InstancesController : ControllerBase
         IRegisterService registerService,
         IApplicationService applicationService,
         IOptions<GeneralSettings> settings,
-        IProcessAuthorizer processAuthorizer
+        IProcessAuthorizer processAuthorizer,
+        IInstanceScopeAuthorizer scopeAuthorizer
     )
     {
         _instanceRepository = instanceRepository;
+        _instanceQueryRepository = instanceQueryRepository;
+        _scopeAuthorizer = scopeAuthorizer;
         _partiesWithInstancesClient = partiesWithInstancesClient;
         _logger = logger;
         _storageBaseAndHost = $"{settings.Value.Hostname}/storage/api/v1/";
@@ -92,6 +101,7 @@ public class InstancesController : ControllerBase
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>A <seealso cref="List{T}"/> contains all instances for given instance owner.</returns>
     /// <!-- GET /instances?org=tdd or GET /instances?appId=tdd/app2 -->
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [Authorize]
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -115,6 +125,14 @@ public class InstancesController : ControllerBase
             return BadRequest(
                 "Both InstanceOwner.PartyId and InstanceOwnerIdentifier cannot be present at the same time."
             );
+        }
+
+        if (
+            await _scopeAuthorizer.AuthorizeApplication(queryParameters.AppId, cancellationToken) is
+            { } scopeProblem
+        )
+        {
+            return scopeProblem.ToResult();
         }
 
         bool hasSyncAdapterScope = _authorizationService.UserHasRequiredScope(
@@ -179,7 +197,7 @@ public class InstancesController : ControllerBase
     {
         try
         {
-            InstanceQueryResult result = await _instanceRepository.GetInstancesFromQuery(
+            InstanceQueryResult result = await _instanceQueryRepository.GetInstancesFromQuery(
                 queryParameters,
                 cancellationToken
             );
@@ -201,6 +219,15 @@ public class InstancesController : ControllerBase
                 if (cancellationToken.IsCancellationRequested)
                 {
                     throw new TimeoutException("Request was cancelled.");
+                }
+
+                // A search with an app id has had its scopes checked against that app.
+                if (string.IsNullOrEmpty(queryParameters.AppId))
+                {
+                    result.Instances = await _scopeAuthorizer.FilterByAppScopes(
+                        result.Instances,
+                        cancellationToken
+                    );
                 }
 
                 (List<InstanceInternal> authorizedInstances, ProblemDetails problem) =
@@ -261,6 +288,7 @@ public class InstancesController : ControllerBase
     /// <param name="instanceGuid">The id of the instance to retrieve.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The information about the specific instance.</returns>
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [Authorize]
     [HttpGet("{instanceOwnerPartyId:int}/{instanceGuid:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -280,7 +308,15 @@ public class InstancesController : ControllerBase
         CancellationToken cancellationToken
     )
     {
-        return await GetInstanceResponseAsync(instanceGuid, cancellationToken);
+        (InstanceInternal instance, ProblemDetails problem) =
+            await _authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                AuthorizationActions.Read,
+                includeElements: true,
+                cancellationToken
+            );
+        return problem is null ? GetInstanceResponse(instance) : problem.ToResult();
     }
 
     /// <summary>
@@ -290,6 +326,7 @@ public class InstancesController : ControllerBase
     /// <param name="instanceGuid">The id of the instance to retrieve.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The information about the specific instance.</returns>
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [Authorize]
     [HttpGet("{instanceGuid:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -308,7 +345,14 @@ public class InstancesController : ControllerBase
         CancellationToken cancellationToken
     )
     {
-        return await GetInstanceResponseAsync(instanceGuid, cancellationToken);
+        (InstanceInternal instance, ProblemDetails problem) =
+            await _authorizationService.GetAuthorizedInstance(
+                instanceGuid,
+                AuthorizationActions.Read,
+                includeElements: true,
+                cancellationToken
+            );
+        return problem is null ? GetInstanceResponse(instance) : problem.ToResult();
     }
 
     /// <summary>
@@ -319,6 +363,7 @@ public class InstancesController : ControllerBase
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The stored instance.</returns>
     /// <!-- POST /instances?appId={appId} -->
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPost]
     [Consumes("application/json")]
@@ -359,6 +404,14 @@ public class InstancesController : ControllerBase
                 404 => NotFound(appInfoError.ErrorMessage),
                 _ => StatusCode(appInfoError.ErrorCode, appInfoError.ErrorMessage),
             };
+        }
+
+        if (
+            await _scopeAuthorizer.AuthorizeApplication(appInfo.Id, cancellationToken) is
+            { } scopeProblem
+        )
+        {
+            return scopeProblem.ToResult();
         }
 
         // Checking that user is authorized to instantiate.
@@ -489,6 +542,7 @@ public class InstancesController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>Information from the deleted instance.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpDelete("{instanceOwnerPartyId:int}/{instanceGuid:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -639,6 +693,7 @@ public class InstancesController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>Returns a list of the process events.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPost("{instanceOwnerPartyId:int}/{instanceGuid:guid}/complete")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -758,6 +813,7 @@ public class InstancesController : ControllerBase
     /// <param name="status">The updated read status.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>Returns the updated instance.</returns>
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [Authorize]
     [HttpPut("{instanceOwnerPartyId:int}/{instanceGuid:guid}/readstatus")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -846,6 +902,7 @@ public class InstancesController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>Returns the updated instance.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPut("{instanceOwnerPartyId:int}/{instanceGuid:guid}/substatus")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -853,6 +910,10 @@ public class InstancesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [Produces("application/json")]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status403Forbidden,
+        "application/problem+json"
+    )]
     public async Task<ActionResult<Instance>> UpdateSubstatus(
         [FromRoute] int instanceOwnerPartyId,
         [FromRoute] Guid instanceGuid,
@@ -880,20 +941,19 @@ public class InstancesController : ControllerBase
             );
         }
 
-        InstanceInternal instance = await _instanceRepository.GetOne(
-            instanceGuid,
-            true,
-            cancellationToken
-        );
-        if (instance is null)
-        {
-            return NotFound($"Unable to find instance {instanceOwnerPartyId}/{instanceGuid}.");
-        }
-
+        // Only the app owner sets the substatus.
         string org = User.GetOrg();
-        if (!instance.Org.Equals(org))
+        (InstanceInternal instance, ProblemDetails problem) =
+            await _authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                i => Task.FromResult(i.Org.Equals(org) ? null : AuthorizationProblems.Forbidden()),
+                includeElements: true,
+                cancellationToken
+            );
+        if (problem is not null)
         {
-            return AuthorizationProblems.Forbidden().ToResult();
+            return problem.ToResult();
         }
 
         InstanceInternal updatedInstance;
@@ -965,6 +1025,7 @@ public class InstancesController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The instance that was updated with an updated collection of presentation texts.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPut("{instanceOwnerPartyId:int}/{instanceGuid:guid}/presentationtexts")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -1004,17 +1065,15 @@ public class InstancesController : ControllerBase
             return BadRequest($"Missing parameter value: presentationTexts is misformed or empty");
         }
 
-        InstanceInternal instance = await _instanceRepository.GetOne(
-            instanceGuid,
-            true,
-            cancellationToken
-        );
-        if (instance is null)
-        {
-            return NotFound($"Unable to find instance {instanceOwnerPartyId}/{instanceGuid}.");
-        }
-
-        if (await _processAuthorizer.AuthorizePresentationTextsUpdate(instance) is { } problem)
+        (InstanceInternal instance, ProblemDetails problem) =
+            await _authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                _processAuthorizer.AuthorizePresentationTextsUpdate,
+                includeElements: true,
+                cancellationToken
+            );
+        if (problem is not null)
         {
             return problem.ToResult();
         }
@@ -1081,6 +1140,7 @@ public class InstancesController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The instance that was updated with an updated collection of data values.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPut("{instanceOwnerPartyId:int}/{instanceGuid:guid}/datavalues")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -1120,17 +1180,14 @@ public class InstancesController : ControllerBase
             return BadRequest($"Missing parameter value: dataValues is misformed or empty");
         }
 
-        InstanceInternal instance = await _instanceRepository.GetOne(
+        (_, ProblemDetails problem) = await _authorizationService.GetAuthorizedInstance(
+            instanceOwnerPartyId,
             instanceGuid,
-            true,
+            _processAuthorizer.AuthorizeDataValuesUpdate,
+            includeElements: true,
             cancellationToken
         );
-        if (instance is null)
-        {
-            return NotFound($"Unable to find instance {instanceOwnerPartyId}/{instanceGuid}.");
-        }
-
-        if (await _processAuthorizer.AuthorizeDataValuesUpdate(instance) is { } problem)
+        if (problem is not null)
         {
             return problem.ToResult();
         }
@@ -1475,34 +1532,10 @@ public class InstancesController : ControllerBase
     }
 
     /// <summary>
-    /// Shared implementation of the instance read endpoints: authorizes the read, then returns the
-    /// instance as seen by the caller.
+    /// Shared response of the instance read endpoints: the authorized instance as seen by the caller.
     /// </summary>
-    private async Task<ActionResult<Instance>> GetInstanceResponseAsync(
-        Guid instanceGuid,
-        CancellationToken cancellationToken
-    )
+    private ActionResult<Instance> GetInstanceResponse(InstanceInternal instance)
     {
-        InstanceInternal instance = await _instanceRepository.GetOne(
-            instanceGuid,
-            true,
-            cancellationToken
-        );
-
-        ProblemDetails problem = await _authorizationService.AuthorizeInstanceRequest(
-            instance,
-            AuthorizationActions.Read
-        );
-        if (problem is not null)
-        {
-            return problem.ToResult();
-        }
-
-        if (instance is null)
-        {
-            return NotFound($"Unable to find instance {instanceGuid}");
-        }
-
         Instance mappedInstance = instance.ToApiModel();
         bool isSyncAdapter = _authorizationService.UserHasRequiredScope([
             _generalSettings.InstanceSyncAdapterScope,

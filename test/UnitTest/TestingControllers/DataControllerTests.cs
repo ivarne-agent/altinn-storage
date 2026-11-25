@@ -71,11 +71,11 @@ public class DataControllerTests : IAsyncLifetime
     /// Created
     /// </summary>
     [Theory]
-    [InlineData("", 1L)]
-    [InlineData(PrincipalUtil.AltinnPortalUserScope, null)]
-    [InlineData("altinn:instances.write", null)]
-    [InlineData("something", 1L)]
-    public async Task Post_NewData_Ok(string scope, long? invalidScopeRequests)
+    [InlineData("", "missing_builtin")]
+    [InlineData(PrincipalUtil.AltinnPortalUserScope, "ok")]
+    [InlineData("altinn:instances.write", "ok")]
+    [InlineData("something", "missing_builtin")]
+    public async Task Post_NewData_Ok(string scope, string expectedScopeCheck)
     {
         string dataPathWithData =
             $"{_versionPrefix}/instances/1337/bc19107c-508f-48d9-bcd7-54ffec905306/data";
@@ -89,7 +89,7 @@ public class DataControllerTests : IAsyncLifetime
         );
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        await _testTelemetry.AssertRequestsWithInvalidScopesCountAsync(invalidScopeRequests);
+        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "write");
     }
 
     [Fact]
@@ -511,11 +511,11 @@ public class DataControllerTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("", 1L)]
-    [InlineData(PrincipalUtil.AltinnPortalUserScope, null)]
-    [InlineData("altinn:instances.read", null)]
-    [InlineData("something", 1L)]
-    public async Task Get_DataElement_Ok(string scope, long? invalidScopeRequests)
+    [InlineData("", "missing_builtin")]
+    [InlineData(PrincipalUtil.AltinnPortalUserScope, "ok")]
+    [InlineData("altinn:instances.read", "ok")]
+    [InlineData("something", "missing_builtin")]
+    public async Task Get_DataElement_Ok(string scope, string expectedScopeCheck)
     {
         string dataPathWithData =
             $"{_versionPrefix}/instances/1337/d91fd644-1028-4efd-924f-4ca187354514/data/f4feb26c-8eed-4d1d-9d75-9239c40724e9";
@@ -525,7 +525,7 @@ public class DataControllerTests : IAsyncLifetime
         HttpResponseMessage response = await client.GetAsync(dataPathWithData);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        await _testTelemetry.AssertRequestsWithInvalidScopesCountAsync(invalidScopeRequests);
+        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "read");
     }
 
     [Theory]

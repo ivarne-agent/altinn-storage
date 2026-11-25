@@ -828,6 +828,7 @@ public class MessageBoxInstancesControllerTests : IAsyncLifetime
             .ReturnsAsync(new InstanceQueryResult { Exception = "query failed" });
         MessageBoxInstancesController controller = new(
             repository.Object,
+            repository.Object,
             Mock.Of<IInstanceEventRepository>(),
             Mock.Of<ITextRepository>(),
             Mock.Of<IApplicationRepository>(),
@@ -1715,6 +1716,7 @@ public class MessageBoxInstancesControllerTests : IAsyncLifetime
         authorization.DelegateGetAuthorizedInstance(instanceRepository);
         var sut = new MessageBoxInstancesController(
             instanceRepository,
+            instanceRepository,
             repoMock.Object,
             null,
             null,
@@ -1767,6 +1769,7 @@ public class MessageBoxInstancesControllerTests : IAsyncLifetime
             == Task.FromResult(new InstanceInternal())
         );
         var sut = new MessageBoxInstancesController(
+            instanceRepository,
             instanceRepository,
             repoMock.Object,
             null,
@@ -1832,6 +1835,7 @@ public class MessageBoxInstancesControllerTests : IAsyncLifetime
         );
         var sut = new MessageBoxInstancesController(
             instanceRepository,
+            instanceRepository,
             repoMock.Object,
             null,
             null,
@@ -1888,6 +1892,7 @@ public class MessageBoxInstancesControllerTests : IAsyncLifetime
             == Task.FromResult(new InstanceInternal())
         );
         var sut = new MessageBoxInstancesController(
+            instanceRepository,
             instanceRepository,
             repoMock.Object,
             null,
@@ -1949,6 +1954,7 @@ public class MessageBoxInstancesControllerTests : IAsyncLifetime
             .Setup(service => service.GetApplicationOrErrorAsync(internalInstance.AppId))
             .ReturnsAsync((new Application { Id = internalInstance.AppId }, null));
         MessageBoxInstancesController controller = new(
+            repository.Object,
             repository.Object,
             instanceEventRepository.Object,
             Mock.Of<ITextRepository>(),

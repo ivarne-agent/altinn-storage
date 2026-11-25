@@ -14,6 +14,7 @@ using Altinn.Platform.Storage.Interface.Enums;
 using Altinn.Platform.Storage.Interface.Models;
 using Altinn.Platform.Storage.Models;
 using Altinn.Platform.Storage.Services;
+using Altinn.Platform.Storage.UnitTest.Mocks;
 using Altinn.Platform.Storage.UnitTest.TestingRepositories;
 using Altinn.Platform.Storage.UnitTest.Utils;
 using Microsoft.AspNetCore.Http;
@@ -51,6 +52,7 @@ public class InstancesControllerCreationIntegrationTests : IClassFixture<Instanc
             .ReturnsAsync(
                 new XacmlJsonResponse { Response = [new XacmlJsonResult { Decision = "Permit" }] }
             );
+        authorization.DelegateGetAuthorizedInstance(_instanceFixture.InstanceRepo);
         Mock<IApplicationService> applicationService = new();
         applicationService
             .Setup(service => service.GetApplicationOrErrorAsync(_appId))
@@ -77,6 +79,7 @@ public class InstancesControllerCreationIntegrationTests : IClassFixture<Instanc
         };
         InstancesController controller = new(
             _instanceFixture.InstanceRepo,
+            _instanceFixture.InstanceRepo,
             partiesWithInstancesClient.Object,
             NullLogger<InstancesController>.Instance,
             authorization.Object,
@@ -84,7 +87,8 @@ public class InstancesControllerCreationIntegrationTests : IClassFixture<Instanc
             Mock.Of<IRegisterService>(),
             applicationService.Object,
             Options.Create(new GeneralSettings { Hostname = "https://storage.test" }),
-            processAuthorizer.Object
+            processAuthorizer.Object,
+            new ScopeAuthorizerStub()
         )
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext },

@@ -20,64 +20,62 @@ internal sealed class TestTelemetry
         Metrics = metrics;
     }
 
-    public async Task AssertRequestsWithInvalidScopesCountAsync(long? expectedCount)
+    /// <summary>
+    /// Asserts that a request was recorded on the request duration metric with the scope check outcome
+    /// <paramref name="expectedOutcome"/> and the scope level <paramref name="expectedAccess"/>.
+    /// </summary>
+    public async Task AssertScopeCheckAsync(string expectedOutcome, string expectedAccess)
     {
-        const int maxAttempts = 10; // 100ms total (10 * 10ms)
+        const int maxAttempts = 10;
         const int delayMs = 10;
 
+        string[] outcomes = [];
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
             Assert.True(_meterProvider.ForceFlush());
-
-            var actualCount = GetInvalidScopesCount();
-            if (actualCount == expectedCount)
+            outcomes = GetScopeChecks();
+            if (outcomes.Contains($"{expectedOutcome}/{expectedAccess}"))
             {
-                return; // Success
+                return;
             }
 
             await Task.Delay(delayMs);
         }
 
-        // Final attempt without delay for assertion failure
-        Assert.True(_meterProvider.ForceFlush());
-        var finalCount = GetInvalidScopesCount();
-        Assert.Equal(expectedCount, finalCount);
+        Assert.Contains($"{expectedOutcome}/{expectedAccess}", outcomes);
     }
 
-    private long? GetInvalidScopesCount()
+    private string[] GetScopeChecks()
     {
-        var metric = Metrics.LastOrDefault(m => m.Name == AspNetCoreMetricsEnricher.MetricName);
+        MetricSnapshot metric = Metrics.LastOrDefault(m =>
+            m.Name == AspNetCoreMetricsEnricher.MetricName
+        );
         if (metric == null)
         {
-            return null;
+            return [];
         }
 
         Assert.Equal(MetricType.Histogram, metric.MetricType);
-        if (metric.MetricPoints.Count == 0)
-        {
-            return null;
-        }
-
-        var points = metric
-            .MetricPoints.Where(p =>
+        return metric
+            .MetricPoints.Select(point =>
             {
-                foreach (var tag in p.Tags)
+                string outcome = null;
+                string access = null;
+                foreach (var tag in point.Tags)
                 {
-                    if (tag.Key == "invalid_scopes" && tag.Value is true)
+                    if (tag.Key == "scope_check")
                     {
-                        return true;
+                        outcome = tag.Value as string;
+                    }
+                    else if (tag.Key == "scope_access")
+                    {
+                        access = tag.Value as string;
                     }
                 }
 
-                return false;
+                return outcome is null ? null : $"{outcome}/{access}";
             })
+            .Where(outcome => outcome is not null)
             .ToArray();
-        if (points.Length == 0)
-        {
-            return null;
-        }
-
-        var point = points[^1];
-        return point.GetHistogramCount();
     }
 }

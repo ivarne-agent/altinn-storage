@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Clients;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
@@ -41,7 +42,6 @@ public class DataController : ControllerBase
 
     private readonly IDataRepository _dataRepository;
     private readonly IBlobRepository _blobRepository;
-    private readonly IInstanceRepository _instanceRepository;
     private readonly IInstanceMutationRepository _instanceMutationRepository;
     private readonly IApplicationRepository _applicationRepository;
     private readonly IDataService _dataService;
@@ -56,7 +56,6 @@ public class DataController : ControllerBase
     /// </summary>
     /// <param name="dataRepository">the data repository handler</param>
     /// <param name="blobRepository">the blob repository handler</param>
-    /// <param name="instanceRepository">the instance repository</param>
     /// <param name="instanceMutationRepository">the aggregate instance mutation repository.</param>
     /// <param name="applicationRepository">the application repository</param>
     /// <param name="dataService">A data service with data element related business logic.</param>
@@ -67,7 +66,6 @@ public class DataController : ControllerBase
     public DataController(
         IDataRepository dataRepository,
         IBlobRepository blobRepository,
-        IInstanceRepository instanceRepository,
         IInstanceMutationRepository instanceMutationRepository,
         IApplicationRepository applicationRepository,
         IDataService dataService,
@@ -79,7 +77,6 @@ public class DataController : ControllerBase
     {
         _dataRepository = dataRepository;
         _blobRepository = blobRepository;
-        _instanceRepository = instanceRepository;
         _instanceMutationRepository = instanceMutationRepository;
         _applicationRepository = applicationRepository;
         _dataService = dataService;
@@ -101,6 +98,7 @@ public class DataController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The metadata of the deleted data element.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpDelete("data/{dataGuid:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -281,6 +279,7 @@ public class DataController : ControllerBase
     /// <param name="dataGuid">The id of the data element to retrieve.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The data file as a stream.</returns>
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [Authorize]
     [HttpGet("data/{dataGuid:guid}")]
     [RequestSizeLimit(RequestSizeLimit)]
@@ -479,6 +478,7 @@ public class DataController : ControllerBase
     /// <param name="blobVersionId">The blob version to retrieve.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The content of the blob version.</returns>
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [Authorize]
     [HttpGet("data/{dataGuid:guid}/versions/{blobVersionId}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -499,26 +499,14 @@ public class DataController : ControllerBase
         CancellationToken cancellationToken
     )
     {
-        (InstanceInternal instance, ActionResult instanceError) = await GetInstanceAsync(
-            instanceGuid,
-            instanceOwnerPartyId,
-            false,
-            cancellationToken
-        );
-        if (instance is null)
-        {
-            return instanceError;
-        }
-
-        // Only the app owner reads blob versions. The sync adapter's bypass of the PDP does not apply here.
-        ProblemDetails problem =
-            User.GetOrg() != instance.Org
-            || _authorizationService.UserHasRequiredScope(_generalSettings.InstanceSyncAdapterScope)
-                ? AuthorizationProblems.Forbidden()
-                : await _authorizationService.AuthorizeInstanceRequest(
-                    instance,
-                    AuthorizationActions.Read
-                );
+        (InstanceInternal instance, ProblemDetails problem) =
+            await _authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                AuthorizeBlobVersionRead,
+                includeElements: false,
+                cancellationToken
+            );
         if (problem is not null)
         {
             return problem.ToResult();
@@ -602,6 +590,7 @@ public class DataController : ControllerBase
     /// <param name="instanceGuid">The id of the instance that the data element is associated with.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The list of data elements</returns>
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [Authorize]
     [HttpGet("dataelements")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -666,6 +655,7 @@ public class DataController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The metadata of the new data element.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPost("data")]
     [DisableFormValueModelBinding]
@@ -846,6 +836,7 @@ public class DataController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The metadata of the updated data element.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPut("data/{dataGuid}")]
     [DisableFormValueModelBinding]
@@ -1187,6 +1178,7 @@ public class DataController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The updated data element.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPut("dataelements/{dataGuid}")]
     [Consumes("application/json")]
@@ -1344,6 +1336,7 @@ public class DataController : ControllerBase
     /// The outcome. Storage does not set the result when the data element does not exist, or when
     /// <see cref="FileScanStatus.BlobVersionId"/> is not the current blob version of the data element.
     /// </returns>
+    [ExcludeFromScopeCheck("Called by other platform components with a platform access token.")]
     [Authorize(Policy = AuthzConstants.POLICY_PLATFORM_FILE_SCAN)]
     [HttpPut("dataelements/{dataGuid}/filescanstatus")]
     [Consumes("application/json")]
@@ -1394,6 +1387,7 @@ public class DataController : ControllerBase
     /// element is gone from <see cref="GetFileScanTarget"/>. Keep it until #466 runs in every environment, so that
     /// Storage can be released before the scanner.
     /// </remarks>
+    [ExcludeFromScopeCheck("Called by other platform components with a platform access token.")]
     [Authorize(Policy = AuthzConstants.POLICY_PLATFORM_FILE_SCAN)]
     [HttpGet("dataelementexists/{dataGuid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -1434,6 +1428,7 @@ public class DataController : ControllerBase
     /// <param name="blobVersionId">The blob version the scan request is for.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>The scan state of the blob version, with the read URL when the scan is pending.</returns>
+    [ExcludeFromScopeCheck("Called by other platform components with a platform access token.")]
     [Authorize(Policy = AuthzConstants.POLICY_PLATFORM_FILE_SCAN)]
     [HttpGet("dataelements/{dataGuid:guid}/blobversions/{blobVersionId}/filescan")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -1514,27 +1509,23 @@ public class DataController : ControllerBase
             : (application, null);
     }
 
-    private async Task<(InstanceInternal Instance, ActionResult ErrorMessage)> GetInstanceAsync(
-        Guid instanceGuid,
-        int instanceOwnerPartyId,
-        bool includeDataelements,
-        CancellationToken cancellationToken
-    )
+    /// <summary>
+    /// Only the app owner reads blob versions. The sync adapter's bypass of the PDP does not apply here.
+    /// </summary>
+    private async Task<ProblemDetails> AuthorizeBlobVersionRead(InstanceInternal instance)
     {
-        InstanceInternal instance = await _instanceRepository.GetOne(
-            instanceGuid,
-            includeDataelements,
-            cancellationToken
-        );
+        if (
+            User.GetOrg() != instance.Org
+            || _authorizationService.UserHasRequiredScope(_generalSettings.InstanceSyncAdapterScope)
+        )
+        {
+            return AuthorizationProblems.Forbidden();
+        }
 
-        return instance is null
-            ? (
-                null,
-                NotFound(
-                    $"Unable to find any instance with id: {instanceOwnerPartyId}/{instanceGuid}."
-                )
-            )
-            : (instance, null);
+        return await _authorizationService.AuthorizeInstanceRequest(
+            instance,
+            AuthorizationActions.Read
+        );
     }
 
     private async Task<(

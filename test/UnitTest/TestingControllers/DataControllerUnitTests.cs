@@ -3734,7 +3734,6 @@ public class DataControllerUnitTests
         var sut = new DataController(
             dataRepositoryMock.Object,
             blobRepositoryMock.Object,
-            instanceRepositoryMock.Object,
             instanceMutationRepositoryMock.Object,
             applicationRepositoryMock.Object,
             dataServiceMock.Object,
@@ -3815,7 +3814,6 @@ public class DataControllerUnitTests
         DataController sut = new(
             dataRepository.Object,
             blobRepository.Object,
-            instanceRepository.Object,
             Mock.Of<IInstanceMutationRepository>(),
             applicationRepository.Object,
             Mock.Of<IDataService>(),
@@ -3926,7 +3924,6 @@ public class DataControllerUnitTests
         DataController sut = new(
             dataRepositoryMock.Object,
             blobRepositoryMock.Object,
-            instanceRepositoryMock.Object,
             mutationRepositoryMock.Object,
             applicationRepositoryMock.Object,
             dataServiceMock.Object,

@@ -1,17 +1,11 @@
 using System;
-using System.Collections.Frozen;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Altinn.AccessManagement.Core.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Abstractions;
-using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,8 +13,8 @@ using Microsoft.Extensions.Logging;
 namespace Altinn.Platform.Storage.Telemetry;
 
 /// <summary>
-/// Enriches the 'http.server.request.duration' metric with client.id and client.consumer.id tags
-/// and invalid_scopes to indicate how many requests are made to an authorized endpoint without proper scopes.
+/// Enriches the 'http.server.request.duration' metric with client.id and client.consumer.id tags. The scope
+/// check adds its own tags where it decides, see <see cref="Authorization.Scopes.ScopeCheckTelemetry"/>.
 /// </summary>
 internal sealed class AspNetCoreMetricsEnricher(ILogger<AspNetCoreMetricsEnricher> logger)
     : IAsyncActionFilter
@@ -31,11 +25,6 @@ internal sealed class AspNetCoreMetricsEnricher(ILogger<AspNetCoreMetricsEnriche
     public const string MetricName = "http.server.request.duration";
 
     private readonly ILogger<AspNetCoreMetricsEnricher> _logger = logger;
-
-    /// <summary>
-    /// A key to indicate if the endpoint is authorized
-    /// </summary>
-    internal static readonly object AllowedScopesKey = new();
 
     /// <summary>
     /// Executes the filter
@@ -71,229 +60,14 @@ internal sealed class AspNetCoreMetricsEnricher(ILogger<AspNetCoreMetricsEnriche
         feature.Tags.Add(new KeyValuePair<string, object?>("client.id", clientId));
         feature.Tags.Add(new KeyValuePair<string, object?>("client.consumer.id", consumerId));
 
-        if (
-            context.ActionDescriptor.Properties.TryGetValue(
-                AllowedScopesKey,
-                out var allowedScopesObj
-            ) && user.Identity?.IsAuthenticated is true
-        )
-        {
-            Debug.Assert(allowedScopesObj is FrozenSet<string>);
-            FrozenSet<string> allowedScopes = (FrozenSet<string>)allowedScopesObj!;
-            ValidateScope(allowedScopes, feature, context.HttpContext);
-        }
-
         return next();
     }
-
-    private static void ValidateScope(
-        FrozenSet<string> allowedScopes,
-        IHttpMetricsTagsFeature feature,
-        HttpContext httpContext
-    )
-    {
-        var user = httpContext.User;
-        Debug.Assert(user is not null);
-        var scopeClaim = user.FindFirst("urn:altinn:scope") ?? user.FindFirst("scope");
-        if (scopeClaim is null)
-        {
-            Report(feature);
-            return;
-        }
-
-        var scopes = scopeClaim.Value.Split(
-            " ",
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
-        );
-        if (scopes.Length == 0)
-        {
-            Report(feature);
-            return;
-        }
-
-        if (!scopes.Any(s => allowedScopes.Contains(s)))
-        {
-            Report(feature);
-            return;
-        }
-
-        static void Report(IHttpMetricsTagsFeature feature) =>
-            feature.Tags.Add(new KeyValuePair<string, object?>("invalid_scopes", true));
-    }
 }
 
 /// <summary>
-/// Custom action descriptor provider to modify the action descriptor
+/// Registers <see cref="AspNetCoreMetricsEnricher"/>.
 /// </summary>
-internal sealed class CustomActionDescriptorProvider : IActionDescriptorProvider
-{
-    /// <summary>
-    /// The order of the action descriptor provider. Lower values are executed first.
-    /// </summary>
-    public int Order => 0;
-
-    private List<ControllerActionDescriptor>? _actionsToValidate;
-    private List<ControllerActionDescriptor>? _actionsNotValidated;
-
-    /// <summary>
-    /// The actions that need instances scope validation
-    /// </summary>
-    public IReadOnlyList<ControllerActionDescriptor>? ActionsToValidate => _actionsToValidate;
-
-    /// <summary>
-    /// The actions that do not need instances scope validation
-    /// </summary>
-    public IReadOnlyList<ControllerActionDescriptor>? ActionsNotValidated => _actionsNotValidated;
-
-    private static readonly FrozenSet<string> _acceptedReadScopes = FrozenSet.Create<string>(
-        StringComparer.OrdinalIgnoreCase,
-        "altinn:portal/enduser",
-        "altinn:instances.read",
-        "altinn:serviceowner/instances.read"
-    );
-
-    private static readonly FrozenSet<string> _acceptedWriteScopes = FrozenSet.Create<string>(
-        StringComparer.OrdinalIgnoreCase,
-        "altinn:portal/enduser",
-        "altinn:instances.write",
-        "altinn:serviceowner/instances.write"
-    );
-
-    private enum RequiredScope
-    {
-        Read,
-        Write,
-    }
-
-    /// <summary>
-    /// Actions to include in scope validation together with the access level they require.
-    /// The key is the action's <see cref="ControllerActionDescriptor.DisplayName"/>.
-    /// </summary>
-    private static readonly FrozenDictionary<string, RequiredScope> _manuallyIncludeActions =
-        new Dictionary<string, RequiredScope>(StringComparer.Ordinal)
-        {
-            [
-                "Altinn.Platform.Storage.Controllers.DataLockController.Unlock (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.InstancesController.Delete (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.InstancesController.GetInstances (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.InstancesController.Get (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.InstancesController.GetByGuid (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.InstancesController.Post (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.InstancesController.UpdateReadStatus (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.InstancesController.UpdateSubstatus (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.InstancesController.AddCompleteConfirmation (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.InstanceEventsController.Post (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.InstanceEventsController.GetOne (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.InstanceEventsController.Get (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.InstanceMutationsController.CommitMutation (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            ["Altinn.Platform.Storage.Controllers.DataController.Get (Altinn.Platform.Storage)"] =
-                RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.DataController.GetBlobVersion (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.DataController.GetMany (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.DataController.Delete (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.DataController.CreateAndUploadData (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.DataController.OverwriteData (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.DataController.Update (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.ProcessController.GetProcessHistory (Altinn.Platform.Storage)"
-            ] = RequiredScope.Read,
-            [
-                "Altinn.Platform.Storage.Controllers.ProcessController.PutInstanceAndEvents (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            [
-                "Altinn.Platform.Storage.Controllers.ProcessController.PutProcess (Altinn.Platform.Storage)"
-            ] = RequiredScope.Write,
-            ["Altinn.Platform.Storage.Controllers.SignController.Sign (Altinn.Platform.Storage)"] =
-                RequiredScope.Write,
-        }.ToFrozenDictionary();
-
-    /// <summary>
-    /// Not used
-    /// </summary>
-    /// <param name="context">context</param>
-    public void OnProvidersExecuting(ActionDescriptorProviderContext context) { }
-
-    /// <summary>
-    /// Annotates the action descriptor with custom properties.
-    /// </summary>
-    /// <param name="context">context</param>
-    public void OnProvidersExecuted(ActionDescriptorProviderContext context)
-    {
-        _actionsToValidate = new List<ControllerActionDescriptor>();
-        _actionsNotValidated = new List<ControllerActionDescriptor>();
-
-        foreach (var action in context.Results.OfType<ControllerActionDescriptor>())
-        {
-            if (
-                _manuallyIncludeActions.TryGetValue(
-                    action.DisplayName ?? string.Empty,
-                    out RequiredScope requiredScope
-                )
-            )
-            {
-                ProcessAction(action, ScopesFor(requiredScope));
-                continue;
-            }
-
-            // Actions are scope-validated only when explicitly listed in _manuallyIncludeActions.
-            _actionsNotValidated.Add(action);
-        }
-    }
-
-    private void ProcessAction(ControllerActionDescriptor action, FrozenSet<string> scopes)
-    {
-        Debug.Assert(_actionsToValidate is not null);
-        action.Properties[AspNetCoreMetricsEnricher.AllowedScopesKey] = scopes;
-        _actionsToValidate.Add(action);
-    }
-
-    private static FrozenSet<string> ScopesFor(RequiredScope requiredScope)
-    {
-        return requiredScope == RequiredScope.Read ? _acceptedReadScopes : _acceptedWriteScopes;
-    }
-}
-
-/// <summary>
-/// Filter for requests (and child dependencies) that should not be logged.
-/// </summary>
-internal static class LogRequestsWithInvalidScopesDI
+internal static class AspNetCoreMetricsEnricherDI
 {
     /// <summary>
     /// Add the filter to the DI container
@@ -301,10 +75,6 @@ internal static class LogRequestsWithInvalidScopesDI
     /// <param name="services">The service collection</param>
     public static void AddAspNetCoreMetricsEnricher(this IServiceCollection services)
     {
-        services.AddSingleton<CustomActionDescriptorProvider>();
-        services.AddSingleton<IActionDescriptorProvider>(sp =>
-            sp.GetRequiredService<CustomActionDescriptorProvider>()
-        );
         services.Configure<MvcOptions>(options =>
         {
             options.Filters.Add<AspNetCoreMetricsEnricher>();

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
 using Altinn.Platform.Storage.Helpers;
@@ -101,6 +102,7 @@ public class InstanceMutationsController(
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <param name="idempotencyKeyHeader">Optional idempotency key. Requires an expected instance version.</param>
     /// <returns>The updated instance, including current blob version ids on its data elements.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPost]
     [DisableFormValueModelBinding]

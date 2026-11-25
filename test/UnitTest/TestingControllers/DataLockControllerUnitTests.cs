@@ -127,7 +127,7 @@ public class DataLockControllerUnitTests
     }
 
     [Fact]
-    public async Task Lock_returns_NotFound_if_Instance_not_found()
+    public async Task Lock_returns_Forbidden_if_Instance_not_found()
     {
         // Arrange
         var instanceGuid = Guid.NewGuid();
@@ -154,7 +154,7 @@ public class DataLockControllerUnitTests
         );
 
         // Assert
-        Assert.IsType<NotFoundObjectResult>(result.Result);
+        await ProblemAsserts.AssertProblemAsync(result.Result, StatusCodes.Status403Forbidden);
         instanceRepoMock.Verify(
             i => i.GetOne(instanceGuid, true, CancellationToken.None),
             Times.Once
@@ -422,6 +422,8 @@ public class DataLockControllerUnitTests
                 );
         }
 
+        authorizationMock.DelegateGetAuthorizedInstance(instanceRepositoryMock.Object);
+
         HttpContext httpContext = new DefaultHttpContext
         {
             User = PrincipalUtil.GetPrincipal(200001, 1337),
@@ -430,7 +432,6 @@ public class DataLockControllerUnitTests
         ControllerContext controllerContext = new() { HttpContext = httpContext };
 
         var sut = new DataLockController(
-            instanceRepositoryMock.Object,
             dataRepositoryMock.Object,
             authorizationMock.Object,
             processAuthorizerMock.Object

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
@@ -50,6 +51,7 @@ public class InstanceEventsController : ControllerBase
     /// <param name="instanceGuid">The id of the instance that the event is associated with.</param>
     /// <param name="instanceEvent">The instance event object to be inserted</param>
     /// <returns>The stored instance event.</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPost]
     [Consumes("application/json")]
@@ -111,6 +113,7 @@ public class InstanceEventsController : ControllerBase
     /// <param name="instanceGuid">The id of the instance that the event is associated with.</param>
     /// <param name="eventGuid">The unique id of the specific event to retrieve.</param>
     /// <returns>Information about the specified event.</returns>
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [Authorize]
     [HttpGet("{eventGuid:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -168,6 +171,7 @@ public class InstanceEventsController : ControllerBase
     /// GET  storage/api/v1/instances/{instanceId}/events?from=2019-05-03T11:55:23&to=2019-05-03T12:55:23
     /// GET  storage/api/v1/instances/{instanceId}/events?from=2019-05-03T11:55:23&to=2019-05-03T12:55:23&eventTypes=deleted,submited
     /// -->
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [Authorize]
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]

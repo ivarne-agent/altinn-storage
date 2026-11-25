@@ -1,0 +1,16 @@
+﻿{
+  Response: {
+    Status: 403 Forbidden,
+    Content: {
+      Headers: {
+        Content-Length: 62,
+        Content-Type: application/problem+json
+      },
+      Value: {
+        type: instance_forbidden,
+        title: Forbidden,
+        status: 403
+      }
+    }
+  }
+}

@@ -10,6 +10,7 @@ using Altinn.Authorization.ABAC.Xacml.JsonProfile;
 using Altinn.Common.PEP.Configuration;
 using Altinn.Common.PEP.Interfaces;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
@@ -55,7 +56,8 @@ public class AuthorizationServiceTest
             options,
             Mock.Of<IMemoryCache>(),
             Options.Create(new PepSettings()),
-            _instanceRepository.Object
+            _instanceRepository.Object,
+            new ScopeAuthorizerStub()
         );
     }
 
@@ -81,7 +83,8 @@ public class AuthorizationServiceTest
             options,
             Mock.Of<IMemoryCache>(),
             Options.Create(new PepSettings()),
-            _instanceRepository.Object
+            _instanceRepository.Object,
+            new ScopeAuthorizerStub()
         );
         await sut.GetDecisionForRequest(new XacmlJsonRequestRoot());
 
@@ -906,11 +909,187 @@ public class AuthorizationServiceTest
         pdp.Verify(m => m.GetDecisionForRequest(It.IsAny<XacmlJsonRequestRoot>()), Times.Never());
     }
 
+    [Fact]
+    public async Task GetAuthorizedInstance_MissingScope_RefusedWithoutPdp()
+    {
+        // Arrange
+        Guid instanceGuid = Guid.NewGuid();
+        InstanceInternal instance = CreateDomainInstance(instanceGuid);
+        Mock<IInstanceRepository> instanceRepository = new();
+        instanceRepository
+            .Setup(r => r.GetOne(instanceGuid, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(instance);
+        Mock<IPDP> pdp = new(MockBehavior.Strict);
+        ProblemDetails scopeProblem = AuthorizationProblems.InsufficientScope(ScopeAccess.Read);
+        Mock<IInstanceScopeAuthorizer> scopeAuthorizer = new();
+        scopeAuthorizer.Setup(s => s.CheckParty(instance, 1000)).Returns(instance);
+        scopeAuthorizer
+            .Setup(s => s.AuthorizeInstance(instance, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(scopeProblem);
+        _claimsPrincipalProviderMock.Setup(c => c.GetUser()).Returns(CreateUserClaims(1));
+        AuthorizationService sut = CreateAuthorizationService(
+            pdp.Object,
+            _claimsPrincipalProviderMock.Object,
+            instanceRepository: instanceRepository.Object,
+            scopeAuthorizer: scopeAuthorizer.Object
+        );
+
+        // Act
+        (InstanceInternal result, ProblemDetails problem) = await sut.GetAuthorizedInstance(
+            1000,
+            instanceGuid,
+            "read",
+            true,
+            CancellationToken.None
+        );
+
+        // Assert
+        Assert.Same(scopeProblem, problem);
+        Assert.Null(result);
+        pdp.Verify(m => m.GetDecisionForRequest(It.IsAny<XacmlJsonRequestRoot>()), Times.Never());
+    }
+
+    [Fact]
+    public async Task GetAuthorizedInstance_PartyCheckTreatsInstanceAsMissing_ScopeCheckedForMissingInstance()
+    {
+        // Arrange
+        Guid instanceGuid = Guid.NewGuid();
+        InstanceInternal instance = CreateDomainInstance(instanceGuid);
+        Mock<IInstanceRepository> instanceRepository = new();
+        instanceRepository
+            .Setup(r => r.GetOne(instanceGuid, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(instance);
+        Mock<IPDP> pdp = new(MockBehavior.Strict);
+        Mock<IInstanceScopeAuthorizer> scopeAuthorizer = new();
+        scopeAuthorizer.Setup(s => s.CheckParty(instance, 2000)).Returns((InstanceInternal)null);
+        scopeAuthorizer
+            .Setup(s => s.AuthorizeInstance(null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProblemDetails)null);
+        _claimsPrincipalProviderMock.Setup(c => c.GetUser()).Returns(CreateUserClaims(1));
+        AuthorizationService sut = CreateAuthorizationService(
+            pdp.Object,
+            _claimsPrincipalProviderMock.Object,
+            instanceRepository: instanceRepository.Object,
+            scopeAuthorizer: scopeAuthorizer.Object
+        );
+
+        // Act
+        (InstanceInternal result, ProblemDetails problem) = await sut.GetAuthorizedInstance(
+            2000,
+            instanceGuid,
+            "read",
+            false,
+            CancellationToken.None
+        );
+
+        // Assert
+        Assert.Equal(StatusCodes.Status403Forbidden, problem?.Status);
+        Assert.Null(result);
+        scopeAuthorizer.Verify(
+            s => s.AuthorizeInstance(null, It.IsAny<CancellationToken>()),
+            Times.Once()
+        );
+    }
+
+    [Theory]
+    [InlineData(false, StatusCodes.Status403Forbidden)]
+    [InlineData(true, StatusCodes.Status404NotFound)]
+    public async Task GetAuthorizedInstanceWithOwnAuthorization_MissingInstance_DoesNotCallIt(
+        bool syncAdapter,
+        int expectedStatus
+    )
+    {
+        // Arrange
+        Guid instanceGuid = Guid.NewGuid();
+        Mock<IInstanceRepository> instanceRepository = new();
+        instanceRepository
+            .Setup(r => r.GetOne(instanceGuid, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((InstanceInternal)null);
+        _claimsPrincipalProviderMock
+            .Setup(c => c.GetUser())
+            .Returns(
+                syncAdapter
+                    ? CreateUserWithScope("altinn:storage/instances.syncadapter")
+                    : CreateUserClaims(1)
+            );
+        AuthorizationService sut = CreateAuthorizationService(
+            new Mock<IPDP>(MockBehavior.Strict).Object,
+            _claimsPrincipalProviderMock.Object,
+            instanceRepository: instanceRepository.Object
+        );
+        bool called = false;
+
+        // Act
+        (InstanceInternal result, ProblemDetails problem) = await sut.GetAuthorizedInstance(
+            1000,
+            instanceGuid,
+            _ =>
+            {
+                called = true;
+                return Task.FromResult<ProblemDetails>(null);
+            },
+            false,
+            CancellationToken.None
+        );
+
+        // Assert
+        Assert.Equal(expectedStatus, problem?.Status);
+        Assert.Null(result);
+        Assert.False(called);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetAuthorizedInstanceWithOwnAuthorization_ReturnsInstanceOnlyWhenAuthorized(
+        bool authorized
+    )
+    {
+        // Arrange
+        Guid instanceGuid = Guid.NewGuid();
+        InstanceInternal instance = CreateDomainInstance(instanceGuid);
+        Mock<IInstanceRepository> instanceRepository = new();
+        instanceRepository
+            .Setup(r => r.GetOne(instanceGuid, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(instance);
+        _claimsPrincipalProviderMock.Setup(c => c.GetUser()).Returns(CreateUserClaims(1));
+        AuthorizationService sut = CreateAuthorizationService(
+            new Mock<IPDP>(MockBehavior.Strict).Object,
+            _claimsPrincipalProviderMock.Object,
+            instanceRepository: instanceRepository.Object
+        );
+
+        // Act
+        (InstanceInternal result, ProblemDetails problem) = await sut.GetAuthorizedInstance(
+            1000,
+            instanceGuid,
+            i =>
+                Task.FromResult(
+                    authorized && i == instance ? null : AuthorizationProblems.Forbidden()
+                ),
+            true,
+            CancellationToken.None
+        );
+
+        // Assert
+        if (authorized)
+        {
+            Assert.Same(instance, result);
+            Assert.Null(problem);
+        }
+        else
+        {
+            Assert.Null(result);
+            Assert.Equal(StatusCodes.Status403Forbidden, problem?.Status);
+        }
+    }
+
     private static AuthorizationService CreateAuthorizationService(
         IPDP pdp,
         IClaimsPrincipalProvider claimsPrincipalProvider,
         IMemoryCache memoryCache = null,
-        IInstanceRepository instanceRepository = null
+        IInstanceRepository instanceRepository = null,
+        IInstanceScopeAuthorizer scopeAuthorizer = null
     )
     {
         return new AuthorizationService(
@@ -925,7 +1104,8 @@ public class AuthorizationServiceTest
             ),
             memoryCache ?? new MemoryCache(new MemoryCacheOptions()),
             Options.Create(new PepSettings { PdpDecisionCachingTimeout = 5 }),
-            instanceRepository ?? Mock.Of<IInstanceRepository>()
+            instanceRepository ?? Mock.Of<IInstanceRepository>(),
+            scopeAuthorizer ?? new ScopeAuthorizerStub()
         );
     }
 
@@ -969,7 +1149,8 @@ public class AuthorizationServiceTest
             Options.Create(new GeneralSettings()),
             memoryCache ?? new MemoryCache(new MemoryCacheOptions()),
             Options.Create(new PepSettings { PdpDecisionCachingTimeout = 5 }),
-            _instanceRepository.Object
+            _instanceRepository.Object,
+            new ScopeAuthorizerStub()
         );
     }
 

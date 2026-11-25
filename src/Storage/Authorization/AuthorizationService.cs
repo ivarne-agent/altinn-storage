@@ -13,6 +13,7 @@ using Altinn.Common.PEP.Configuration;
 using Altinn.Common.PEP.Constants;
 using Altinn.Common.PEP.Helpers;
 using Altinn.Common.PEP.Interfaces;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Models;
@@ -38,6 +39,7 @@ namespace Altinn.Platform.Storage.Authorization;
 /// <param name="memoryCache">The memory cache</param>
 /// <param name="pepSettings">The settings for pep</param>
 /// <param name="instanceRepository">Repository used to load the instance an authorization decision concerns.</param>
+/// <param name="scopeAuthorizer">Checks the party in the route and the API scopes before Altinn Authorization is asked.</param>
 public class AuthorizationService(
     IPDP pdp,
     IClaimsPrincipalProvider claimsPrincipalProvider,
@@ -45,9 +47,11 @@ public class AuthorizationService(
     IOptions<GeneralSettings> settings,
     IMemoryCache memoryCache,
     IOptions<PepSettings> pepSettings,
-    IInstanceRepository instanceRepository
+    IInstanceRepository instanceRepository,
+    IInstanceScopeAuthorizer scopeAuthorizer
 ) : IAuthorization
 {
+    private readonly IInstanceScopeAuthorizer _scopeAuthorizer = scopeAuthorizer;
     private readonly IPDP _pdp = pdp;
     private readonly IInstanceRepository _instanceRepository = instanceRepository;
     private readonly IClaimsPrincipalProvider _claimsPrincipalProvider = claimsPrincipalProvider;
@@ -233,13 +237,13 @@ public class AuthorizationService(
         CancellationToken cancellationToken
     )
     {
-        InstanceInternal instance = await _instanceRepository.GetOne(
+        (InstanceInternal instance, ProblemDetails problem) = await LoadInstanceAndCheckScope(
+            instanceOwnerPartyId,
             instanceGuid,
             includeElements,
             cancellationToken
         );
-
-        ProblemDetails problem = await AuthorizeInstanceRequest(instance, action);
+        problem ??= await AuthorizeInstanceRequest(instance, action);
         if (problem is not null)
         {
             return (null, problem);
@@ -251,6 +255,117 @@ public class AuthorizationService(
         }
 
         return (instance, null);
+    }
+
+    /// <inheritdoc />
+    public async Task<(InstanceInternal Instance, ProblemDetails Problem)> GetAuthorizedInstance(
+        Guid instanceGuid,
+        string action,
+        bool includeElements,
+        CancellationToken cancellationToken
+    )
+    {
+        (InstanceInternal instance, ProblemDetails problem) = await LoadInstanceAndCheckScope(
+            null,
+            instanceGuid,
+            includeElements,
+            cancellationToken
+        );
+        problem ??= await AuthorizeInstanceRequest(instance, action);
+        if (problem is not null)
+        {
+            return (null, problem);
+        }
+
+        if (instance is null)
+        {
+            return (null, AuthorizationProblems.NotFound(instanceGuid));
+        }
+
+        return (instance, null);
+    }
+
+    /// <inheritdoc />
+    public async Task<(InstanceInternal Instance, ProblemDetails Problem)> GetAuthorizedInstance(
+        int instanceOwnerPartyId,
+        Guid instanceGuid,
+        Func<InstanceInternal, Task<ProblemDetails>> authorize,
+        bool includeElements,
+        CancellationToken cancellationToken
+    )
+    {
+        ArgumentNullException.ThrowIfNull(authorize);
+
+        (InstanceInternal instance, ProblemDetails problem) = await LoadInstanceAndCheckScope(
+            instanceOwnerPartyId,
+            instanceGuid,
+            includeElements,
+            cancellationToken
+        );
+        if (problem is not null)
+        {
+            return (null, problem);
+        }
+
+        // The sync adapter may read every instance, so it learns nothing from a 404.
+        if (instance is null)
+        {
+            return (
+                null,
+                UserHasRequiredScope([_settings.InstanceSyncAdapterScope])
+                    ? AuthorizationProblems.NotFound(instanceOwnerPartyId, instanceGuid)
+                    : AuthorizationProblems.Forbidden()
+            );
+        }
+
+        problem = await authorize(instance);
+        return problem is null ? (instance, null) : (null, problem);
+    }
+
+    /// <inheritdoc />
+    public async Task<InstanceInternal> GetInstanceForAuthInfo(
+        int instanceOwnerPartyId,
+        Guid instanceGuid,
+        CancellationToken cancellationToken
+    )
+    {
+        InstanceInternal instance = await _instanceRepository.GetOne(
+            instanceGuid,
+            false,
+            cancellationToken
+        );
+        return instance?.InstanceOwner.PartyId == instanceOwnerPartyId.ToString() ? instance : null;
+    }
+
+    /// <summary>
+    /// Loads the instance, treats an instance of another party than the route's as missing (as the party
+    /// check's mode decides), and checks the API scopes. Altinn Authorization is not asked.
+    /// </summary>
+    private async Task<(
+        InstanceInternal Instance,
+        ProblemDetails Problem
+    )> LoadInstanceAndCheckScope(
+        int? instanceOwnerPartyId,
+        Guid instanceGuid,
+        bool includeElements,
+        CancellationToken cancellationToken
+    )
+    {
+        InstanceInternal instance = await _instanceRepository.GetOne(
+            instanceGuid,
+            includeElements,
+            cancellationToken
+        );
+        if (instanceOwnerPartyId is { } partyId)
+        {
+            instance = _scopeAuthorizer.CheckParty(instance, partyId);
+        }
+
+        ProblemDetails problem = await _scopeAuthorizer.AuthorizeInstance(
+            instance,
+            cancellationToken
+        );
+        return (instance, problem);
     }
 
     /// <inheritdoc />

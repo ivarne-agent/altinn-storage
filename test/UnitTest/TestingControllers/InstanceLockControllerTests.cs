@@ -119,10 +119,10 @@ public class InstanceLockControllerTest : IAsyncLifetime
 
     /// <summary>
     /// Test case: Instance not found when trying to acquire lock
-    /// Expected: Returns 404 Not Found with problem details
+    /// Expected: Returns 403 Forbidden with problem details
     /// </summary>
     [Fact]
-    public async Task AcquireInstanceLock_InstanceNotFound_ReturnsNotFound()
+    public async Task AcquireInstanceLock_InstanceNotFound_ReturnsForbidden()
     {
         // Arrange
         var instanceGuid = Guid.NewGuid();
@@ -355,10 +355,10 @@ public class InstanceLockControllerTest : IAsyncLifetime
 
     /// <summary>
     /// Test case: Instance doesn't exist
-    /// Expected: Returns 404 Not Found with problem details
+    /// Expected: Returns 403 Forbidden with problem details
     /// </summary>
     [Fact]
-    public async Task UpdateInstanceLock_InstanceNotFound_ReturnsNotFound()
+    public async Task UpdateInstanceLock_InstanceNotFound_ReturnsForbidden()
     {
         // Arrange
         var lockId = 12345;
@@ -407,10 +407,10 @@ public class InstanceLockControllerTest : IAsyncLifetime
 
     /// <summary>
     /// Test case: Instance exists but instanceOwnerPartyId doesn't match
-    /// Expected: Returns 404 Not Found with problem details
+    /// Expected: Returns 403 Forbidden with problem details
     /// </summary>
     [Fact]
-    public async Task AcquireInstanceLock_InstanceOwnerPartyIdMismatch_ReturnsNotFound()
+    public async Task AcquireInstanceLock_InstanceOwnerPartyIdMismatch_ReturnsForbidden()
     {
         // Arrange
         var requestUri = $"storage/api/v1/instances/9999/{_instanceGuid}/lock";
@@ -430,10 +430,10 @@ public class InstanceLockControllerTest : IAsyncLifetime
 
     /// <summary>
     /// Test case: Instance exists but instanceOwnerPartyId doesn't match when updating lock
-    /// Expected: Returns 404 Not Found with problem details
+    /// Expected: Returns 403 Forbidden with problem details
     /// </summary>
     [Fact]
-    public async Task UpdateInstanceLock_InstanceOwnerPartyIdMismatch_ReturnsNotFound()
+    public async Task UpdateInstanceLock_InstanceOwnerPartyIdMismatch_ReturnsForbidden()
     {
         // Arrange
         var lockId = 12345;

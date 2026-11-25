@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Enums;
 using Altinn.Platform.Storage.Interface.Models;
@@ -31,7 +32,8 @@ namespace Altinn.Platform.Storage.Controllers;
 [ExcludeFromPublicStorageApi]
 public class MessageBoxInstancesController : ControllerBase
 {
-    private readonly IInstanceRepository _instanceRepository;
+    private readonly IInstanceWriteRepository _instanceRepository;
+    private readonly IInstanceQueryRepository _instanceQueryRepository;
     private readonly IInstanceEventRepository _instanceEventRepository;
     private readonly ITextRepository _textRepository;
     private readonly IApplicationRepository _applicationRepository;
@@ -43,6 +45,7 @@ public class MessageBoxInstancesController : ControllerBase
     /// Initializes a new instance of the <see cref="MessageBoxInstancesController"/> class
     /// </summary>
     /// <param name="instanceRepository">the instance repository handler</param>
+    /// <param name="instanceQueryRepository">the instance search</param>
     /// <param name="instanceEventRepository">the instance event repository handler</param>
     /// <param name="textRepository">the text repository handler</param>
     /// <param name="applicationRepository">the application repository handler</param>
@@ -50,7 +53,8 @@ public class MessageBoxInstancesController : ControllerBase
     /// <param name="applicationService">the application service</param>
     /// <param name="logger">The logger</param>
     public MessageBoxInstancesController(
-        IInstanceRepository instanceRepository,
+        IInstanceWriteRepository instanceRepository,
+        IInstanceQueryRepository instanceQueryRepository,
         IInstanceEventRepository instanceEventRepository,
         ITextRepository textRepository,
         IApplicationRepository applicationRepository,
@@ -60,6 +64,7 @@ public class MessageBoxInstancesController : ControllerBase
     )
     {
         _instanceRepository = instanceRepository;
+        _instanceQueryRepository = instanceQueryRepository;
         _instanceEventRepository = instanceEventRepository;
         _textRepository = textRepository;
         _applicationRepository = applicationRepository;
@@ -74,6 +79,7 @@ public class MessageBoxInstancesController : ControllerBase
     /// <param name="queryModel">Object with query-params</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>List of messagebox instances</returns>
+    [RequireScope(ApiScopeRules.SyncAdapter, ScopeAccess.Read)]
     [Authorize]
     [HttpPost("search")]
     [ProducesResponseType<ProblemDetails>(
@@ -129,10 +135,11 @@ public class MessageBoxInstancesController : ControllerBase
                 queryParams.AppIds = await MatchStringToAppTitle(queryModel.SearchString);
             }
 
-            InstanceQueryResult queryResponse = await _instanceRepository.GetInstancesFromQuery(
-                queryParams,
-                cancellationToken
-            );
+            InstanceQueryResult queryResponse =
+                await _instanceQueryRepository.GetInstancesFromQuery(
+                    queryParams,
+                    cancellationToken
+                );
 
             AddQueryModelToTelemetry(queryModel);
 
@@ -173,6 +180,7 @@ public class MessageBoxInstancesController : ControllerBase
     /// <param name="language"> language id en, nb, nn-NO"</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>list of instances</returns>
+    [RequireScope(ApiScopeRules.SyncAdapter, ScopeAccess.Read)]
     [Authorize]
     [HttpGet("{instanceOwnerPartyId:int}/{instanceGuid:guid}")]
     [ProducesResponseType<ProblemDetails>(
@@ -198,17 +206,47 @@ public class MessageBoxInstancesController : ControllerBase
             languageId = language;
         }
 
-        InstanceInternal? instance = await _instanceRepository.GetOne(
-            instanceGuid,
-            false,
-            cancellationToken
-        );
-
-        if (instance == null)
+        MessageBoxInstance? authorizedInstance = null;
+        (InstanceInternal? instance, ProblemDetails? problem) =
+            await _authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                async i =>
+                {
+                    (authorizedInstance, ProblemDetails? authorizationProblem) =
+                        await AuthorizeMessageBoxInstance(i, cancellationToken);
+                    return authorizationProblem;
+                },
+                includeElements: false,
+                cancellationToken
+            );
+        if (instance is null || authorizedInstance is null)
         {
-            return NotFound($"Could not find instance {instanceOwnerPartyId}/{instanceGuid}");
+            return problem!.ToResult();
         }
 
+        // get app texts and exchange all text keys.
+        List<TextResource> texts = await _textRepository.Get(
+            new List<string> { instance.AppId },
+            languageId
+        );
+        InstanceHelper.ReplaceTextKeys(
+            new List<MessageBoxInstance> { authorizedInstance },
+            texts,
+            languageId
+        );
+
+        return Ok(authorizedInstance);
+    }
+
+    /// <summary>
+    /// Authorizes the instance as a messagebox instance, with the actions the messagebox shows.
+    /// </summary>
+    private async Task<(
+        MessageBoxInstance? Instance,
+        ProblemDetails? Problem
+    )> AuthorizeMessageBoxInstance(InstanceInternal instance, CancellationToken cancellationToken)
+    {
         bool includeInstantiate = false;
         if (instance.Status.IsArchived)
         {
@@ -227,28 +265,12 @@ public class MessageBoxInstancesController : ControllerBase
             );
         if (authorizedInstanceList is null)
         {
-            return authorizationProblem!.ToResult();
+            return (null, authorizationProblem);
         }
 
-        if (authorizedInstanceList.Count <= 0)
-        {
-            return AuthorizationProblems.Forbidden().ToResult();
-        }
-
-        MessageBoxInstance authorizedInstance = authorizedInstanceList[0];
-
-        // get app texts and exchange all text keys.
-        List<TextResource> texts = await _textRepository.Get(
-            new List<string> { instance.AppId },
-            languageId
-        );
-        InstanceHelper.ReplaceTextKeys(
-            new List<MessageBoxInstance> { authorizedInstance },
-            texts,
-            languageId
-        );
-
-        return Ok(authorizedInstance);
+        return authorizedInstanceList.Count <= 0
+            ? (null, AuthorizationProblems.Forbidden())
+            : (authorizedInstanceList[0], null);
     }
 
     /// <summary>
@@ -257,6 +279,7 @@ public class MessageBoxInstancesController : ControllerBase
     /// <param name="instanceOwnerPartyId">the instance owner id</param>
     /// <param name="instanceGuid">the instance guid</param>
     /// <returns>list of instances</returns>
+    [RequireScope(ApiScopeRules.SyncAdapter, ScopeAccess.Read)]
     [Authorize]
     [HttpGet("{instanceOwnerPartyId:int}/{instanceGuid:guid}/events")]
     [ProducesResponseType<ProblemDetails>(
@@ -325,6 +348,7 @@ public class MessageBoxInstancesController : ControllerBase
     /// <param name="instanceGuid">instance id</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>True if the instance was restored.</returns>
+    [RequireScope(ApiScopeRules.SyncAdapter, ScopeAccess.Write)]
     [Authorize]
     [HttpPut("{instanceOwnerPartyId:int}/{instanceGuid:guid}/undelete")]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -417,6 +441,7 @@ public class MessageBoxInstancesController : ControllerBase
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>true if instance was successfully deleted</returns>
     /// DELETE /instances/{instanceId}?instanceOwnerPartyId={instanceOwnerPartyId}?hard={bool}
+    [RequireScope(ApiScopeRules.SyncAdapter, ScopeAccess.Write)]
     [Authorize]
     [HttpDelete("{instanceOwnerPartyId:int}/{instanceGuid:guid}")]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

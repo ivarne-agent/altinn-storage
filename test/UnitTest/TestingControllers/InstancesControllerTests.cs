@@ -124,11 +124,11 @@ public class InstancesControllerTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("", 1L)]
-    [InlineData(PrincipalUtil.AltinnPortalUserScope, null)]
-    [InlineData("altinn:instances.read", null)]
-    [InlineData("something", 1L)]
-    public async Task Get_One_Ok(string scope, long? invalidScopeRequests)
+    [InlineData("", "missing_builtin")]
+    [InlineData(PrincipalUtil.AltinnPortalUserScope, "ok")]
+    [InlineData("altinn:instances.read", "ok")]
+    [InlineData("something", "missing_builtin")]
+    public async Task Get_One_Ok(string scope, string expectedScopeCheck)
     {
         // Arrange
         int instanceOwnerPartyId = 1337;
@@ -148,15 +148,15 @@ public class InstancesControllerTests : IAsyncLifetime
         string responseContent = await response.Content.ReadAsStringAsync();
         Instance instance = JsonConvert.DeserializeObject<Instance>(responseContent);
         Assert.Equal("1337", instance.InstanceOwner.PartyId);
-        await _testTelemetry.AssertRequestsWithInvalidScopesCountAsync(invalidScopeRequests);
+        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "read");
     }
 
     [Theory]
-    [InlineData("", 1L)]
-    [InlineData(PrincipalUtil.AltinnPortalUserScope, null)]
-    [InlineData("altinn:instances.read", null)]
-    [InlineData("something", 1L)]
-    public async Task GetByGuid_One_Ok(string scope, long? invalidScopeRequests)
+    [InlineData("", "missing_builtin")]
+    [InlineData(PrincipalUtil.AltinnPortalUserScope, "ok")]
+    [InlineData("altinn:instances.read", "ok")]
+    [InlineData("something", "missing_builtin")]
+    public async Task GetByGuid_One_Ok(string scope, string expectedScopeCheck)
     {
         // Arrange
         string instanceGuid = "46133fb5-a9f2-45d4-90b1-f6d93ad40713";
@@ -175,7 +175,7 @@ public class InstancesControllerTests : IAsyncLifetime
         string responseContent = await response.Content.ReadAsStringAsync();
         Instance instance = JsonConvert.DeserializeObject<Instance>(responseContent);
         Assert.Equal("1337/46133fb5-a9f2-45d4-90b1-f6d93ad40713", instance.Id);
-        await _testTelemetry.AssertRequestsWithInvalidScopesCountAsync(invalidScopeRequests);
+        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "read");
     }
 
     [Fact]
@@ -572,11 +572,11 @@ public class InstancesControllerTests : IAsyncLifetime
     /// Expected: Returns status forbidden.
     /// </summary>
     [Theory]
-    [InlineData("", 1L)]
-    [InlineData(PrincipalUtil.AltinnPortalUserScope, null)]
-    [InlineData("altinn:instances.write", null)]
-    [InlineData("something", 1L)]
-    public async Task Post_Ok(string scope, long? invalidScopeRequests)
+    [InlineData("", "missing_builtin")]
+    [InlineData(PrincipalUtil.AltinnPortalUserScope, "ok")]
+    [InlineData("altinn:instances.write", "ok")]
+    [InlineData("something", "missing_builtin")]
+    public async Task Post_Ok(string scope, string expectedScopeCheck)
     {
         // Arrange
         string appId = "tdd/endring-av-navn";
@@ -603,13 +603,13 @@ public class InstancesControllerTests : IAsyncLifetime
         string json = await response.Content.ReadAsStringAsync();
         Instance createdInstance = JsonConvert.DeserializeObject<Instance>(json);
         Assert.NotNull(createdInstance);
-        await _testTelemetry.AssertRequestsWithInvalidScopesCountAsync(invalidScopeRequests);
+        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "write");
     }
 
     [Theory]
-    [InlineData("", 1L)]
-    [InlineData("altinn:serviceowner/instances.write", null)]
-    public async Task Post_Org_Ok(string scope, long? invalidScopeRequests)
+    [InlineData("", "missing_builtin")]
+    [InlineData("altinn:serviceowner/instances.write", "ok_serviceowner_builtin")]
+    public async Task Post_Org_Ok(string scope, string expectedScopeCheck)
     {
         // Arrange
         string appId = "tdd/endring-av-navn";
@@ -636,7 +636,7 @@ public class InstancesControllerTests : IAsyncLifetime
         string json = await response.Content.ReadAsStringAsync();
         Instance createdInstance = JsonConvert.DeserializeObject<Instance>(json);
         Assert.NotNull(createdInstance);
-        await _testTelemetry.AssertRequestsWithInvalidScopesCountAsync(invalidScopeRequests);
+        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "write");
     }
 
     [Theory]
@@ -1238,9 +1238,9 @@ public class InstancesControllerTests : IAsyncLifetime
     /// Expected: List of instances is returned.
     /// </summary>
     [Theory]
-    [InlineData("", 1L)]
-    [InlineData("altinn:serviceowner/instances.read", null)]
-    public async Task GetMany_OrgRequestsAllInstances_Ok(string scope, long? invalidScopeRequests)
+    [InlineData("", "missing_builtin")]
+    [InlineData("altinn:serviceowner/instances.read", "ok_serviceowner_builtin")]
+    public async Task GetMany_OrgRequestsAllInstances_Ok(string scope, string expectedScopeCheck)
     {
         // Arrange
         string requestUri = $"{BasePath}?org=ttd";
@@ -1265,7 +1265,7 @@ public class InstancesControllerTests : IAsyncLifetime
             Assert.Equal(expectedNoInstances, queryResponse.Count);
         }
 
-        await _testTelemetry.AssertRequestsWithInvalidScopesCountAsync(invalidScopeRequests);
+        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "read");
     }
 
     /// <summary>
@@ -1800,6 +1800,7 @@ public class InstancesControllerTests : IAsyncLifetime
             .Returns(false);
         InstancesController controller = new(
             repository.Object,
+            repository.Object,
             Mock.Of<IPartiesWithInstancesClient>(),
             Mock.Of<ILogger<InstancesController>>(),
             authorization.Object,
@@ -1807,7 +1808,8 @@ public class InstancesControllerTests : IAsyncLifetime
             Mock.Of<IRegisterService>(),
             Mock.Of<IApplicationService>(),
             Options.Create(new Altinn.Platform.Storage.Configuration.GeneralSettings()),
-            Mock.Of<IProcessAuthorizer>()
+            Mock.Of<IProcessAuthorizer>(),
+            new ScopeAuthorizerStub()
         )
         {
             ControllerContext = new ControllerContext
@@ -3415,6 +3417,7 @@ public class InstancesControllerTests : IAsyncLifetime
             .ReturnsAuthorization(true);
         return new InstancesController(
             repository.Object,
+            repository.Object,
             Mock.Of<IPartiesWithInstancesClient>(),
             NullLogger<InstancesController>.Instance,
             AuthorizationMockExtensions.CreatePermissiveAuthorization(repository.Object),
@@ -3422,7 +3425,8 @@ public class InstancesControllerTests : IAsyncLifetime
             Mock.Of<IRegisterService>(),
             Mock.Of<IApplicationService>(),
             Options.Create(new GeneralSettings()),
-            authorizer.Object
+            authorizer.Object,
+            new ScopeAuthorizerStub()
         )
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
@@ -3562,6 +3566,7 @@ public class InstancesControllerTests : IAsyncLifetime
         };
         InstancesController controller = new(
             repository.Object,
+            repository.Object,
             Mock.Of<IPartiesWithInstancesClient>(),
             NullLogger<InstancesController>.Instance,
             AuthorizationMockExtensions.CreatePermissiveAuthorization(repository.Object),
@@ -3569,7 +3574,8 @@ public class InstancesControllerTests : IAsyncLifetime
             Mock.Of<IRegisterService>(),
             applicationService.Object,
             Options.Create(new GeneralSettings { Hostname = "https://storage.test" }),
-            processAuthorizer.Object
+            processAuthorizer.Object,
+            new ScopeAuthorizerStub()
         )
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext },

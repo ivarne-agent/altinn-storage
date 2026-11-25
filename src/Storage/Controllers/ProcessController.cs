@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
 using Altinn.Platform.Storage.Helpers;
@@ -28,7 +29,7 @@ namespace Altinn.Platform.Storage.Controllers;
 [ApiController]
 public class ProcessController : ControllerBase
 {
-    private readonly IInstanceRepository _instanceRepository;
+    private readonly IInstanceWriteRepository _instanceRepository;
     private readonly IInstanceEventRepository _instanceEventRepository;
     private readonly IInstanceMutationRepository _instanceMutationRepository;
     private readonly string _storageBaseAndHost;
@@ -55,7 +56,7 @@ public class ProcessController : ControllerBase
     /// <param name="authorizationService">the authorization service</param>
     /// <param name="logger">the logger</param>
     public ProcessController(
-        IInstanceRepository instanceRepository,
+        IInstanceWriteRepository instanceRepository,
         IInstanceEventRepository instanceEventRepository,
         IInstanceMutationRepository instanceMutationRepository,
         IOptions<GeneralSettings> generalsettings,
@@ -91,6 +92,7 @@ public class ProcessController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns>The updated instance</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPut]
     [Consumes("application/json")]
@@ -124,53 +126,33 @@ public class ProcessController : ControllerBase
             return preconditionError;
         }
 
-        InstanceInternal existingInstance = await _instanceRepository.GetOne(
-            instanceGuid,
-            true,
-            cancellationToken
-        );
+        ActionResult? versionMismatch = null;
+        (InstanceInternal? existingInstance, ProblemDetails? processNextProblem) =
+            await _authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                instance =>
+                {
+                    // A stale client fails fast, without a policy decision. The 403 only stops the load.
+                    versionMismatch = CheckVersionPreconditions(instance, preconditions);
+                    return versionMismatch is null
+                        ? _processAuthorizer.AuthorizeProcessNext(instance, processState)
+                        : Task.FromResult<ProblemDetails?>(AuthorizationProblems.Forbidden());
+                },
+                includeElements: true,
+                cancellationToken
+            );
+        if (versionMismatch is not null)
+        {
+            return versionMismatch;
+        }
 
         if (existingInstance is null)
         {
-            return NotFound();
+            return processNextProblem!.ToResult();
         }
 
         StorageVersions currentVersions = existingInstance.Versions;
-        if (
-            preconditions.InstanceVersion is not null
-            && preconditions.InstanceVersion != currentVersions.InstanceVersion
-        )
-        {
-            return VersionPreconditionHelper.VersionMismatch(
-                Response,
-                new InstanceVersionMismatchException(
-                    currentVersions.InstanceVersion,
-                    currentVersions.ProcessStateVersion
-                )
-            );
-        }
-
-        if (
-            preconditions.ProcessStateVersion is not null
-            && preconditions.ProcessStateVersion != currentVersions.ProcessStateVersion
-        )
-        {
-            return VersionPreconditionHelper.VersionMismatch(
-                Response,
-                new ProcessStateVersionMismatchException(
-                    currentVersions.InstanceVersion,
-                    currentVersions.ProcessStateVersion
-                )
-            );
-        }
-
-        if (
-            await _processAuthorizer.AuthorizeProcessNext(existingInstance, processState) is
-            { } processNextProblem
-        )
-        {
-            return processNextProblem.ToResult();
-        }
 
         UpdateInstance(existingInstance, processState, out var updateProperties);
 
@@ -227,6 +209,7 @@ public class ProcessController : ControllerBase
     /// <param name="ifInstanceVersionMatch">Optional expected aggregate instance version.</param>
     /// <param name="ifProcessStateVersionMatch">Optional expected process-state version.</param>
     /// <returns></returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPut("instanceandevents")]
     [Consumes("application/json")]
@@ -267,45 +250,36 @@ public class ProcessController : ControllerBase
             return BadRequest("Invalid instance state");
         }
 
-        InstanceInternal existingInstance = await _instanceRepository.GetOne(
-            instanceGuid,
-            true,
-            cancellationToken
-        );
+        ActionResult? versionMismatch = null;
+        (InstanceInternal? existingInstance, ProblemDetails? processNextProblem) =
+            await _authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                instance =>
+                {
+                    // A stale client fails fast, without a policy decision. The 403 only stops the load.
+                    versionMismatch = CheckVersionPreconditions(instance, preconditions);
+                    return versionMismatch is null
+                        ? _processAuthorizer.AuthorizeProcessNext(
+                            instance,
+                            processStateUpdate.State
+                        )
+                        : Task.FromResult<ProblemDetails?>(AuthorizationProblems.Forbidden());
+                },
+                includeElements: true,
+                cancellationToken
+            );
+        if (versionMismatch is not null)
+        {
+            return versionMismatch;
+        }
 
         if (existingInstance is null)
         {
-            return NotFound();
+            return processNextProblem!.ToResult();
         }
 
         StorageVersions currentVersions = existingInstance.Versions;
-        if (
-            preconditions.InstanceVersion is not null
-            && preconditions.InstanceVersion != currentVersions.InstanceVersion
-        )
-        {
-            return VersionPreconditionHelper.VersionMismatch(
-                Response,
-                new InstanceVersionMismatchException(
-                    currentVersions.InstanceVersion,
-                    currentVersions.ProcessStateVersion
-                )
-            );
-        }
-
-        if (
-            preconditions.ProcessStateVersion is not null
-            && preconditions.ProcessStateVersion != currentVersions.ProcessStateVersion
-        )
-        {
-            return VersionPreconditionHelper.VersionMismatch(
-                Response,
-                new ProcessStateVersionMismatchException(
-                    currentVersions.InstanceVersion,
-                    currentVersions.ProcessStateVersion
-                )
-            );
-        }
 
         try
         {
@@ -344,14 +318,6 @@ public class ProcessController : ControllerBase
         }
 
         ProcessState processState = processStateUpdate.State;
-
-        if (
-            await _processAuthorizer.AuthorizeProcessNext(existingInstance, processState) is
-            { } processNextProblem
-        )
-        {
-            return processNextProblem.ToResult();
-        }
 
         // When the instance is entering a task, remove any data elements that were generated by previous
         // visits to that same task (e.g. stale PDFs, signatures) - unless the caller manages its own
@@ -476,6 +442,7 @@ public class ProcessController : ControllerBase
     /// <param name="instanceOwnerPartyId">The party id of the instance owner.</param>
     /// <param name="instanceGuid">The id of the instance whos process history to retrieve.</param>
     /// <returns>Returns a list of the process events.</returns>
+    [InstanceScopeAccess(ScopeAccess.Read)]
     [HttpGet("history")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -530,6 +497,7 @@ public class ProcessController : ControllerBase
     /// <param name="instanceGuid">The id of the instance to retrieve.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>Authorization info.</returns>
+    [ExcludeFromScopeCheck("Altinn Authorization reads the process state it bases decisions on.")]
     [HttpGet("authinfo")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -544,12 +512,12 @@ public class ProcessController : ControllerBase
         string? message = null;
         try
         {
-            InstanceInternal? instance = await _instanceRepository.GetOne(
+            InstanceInternal? instance = await _authorizationService.GetInstanceForAuthInfo(
+                instanceOwnerPartyId,
                 instanceGuid,
-                false,
                 cancellationToken
             );
-            if (instance?.InstanceOwner.PartyId == instanceOwnerPartyId.ToString())
+            if (instance is not null)
             {
                 VersionPreconditionHelper.WriteVersionResponseHeaders(Response, instance);
                 return Ok(new AuthInfo() { Process = instance.Process, AppId = instance.AppId });
@@ -563,6 +531,43 @@ public class ProcessController : ControllerBase
         return NotFound(
             $"Unable to find instance {instanceOwnerPartyId}/{instanceGuid}: {message}"
         );
+    }
+
+    private ActionResult? CheckVersionPreconditions(
+        InstanceInternal instance,
+        VersionPreconditions preconditions
+    )
+    {
+        StorageVersions currentVersions = instance.Versions;
+        if (
+            preconditions.InstanceVersion is not null
+            && preconditions.InstanceVersion != currentVersions.InstanceVersion
+        )
+        {
+            return VersionPreconditionHelper.VersionMismatch(
+                Response,
+                new InstanceVersionMismatchException(
+                    currentVersions.InstanceVersion,
+                    currentVersions.ProcessStateVersion
+                )
+            );
+        }
+
+        if (
+            preconditions.ProcessStateVersion is not null
+            && preconditions.ProcessStateVersion != currentVersions.ProcessStateVersion
+        )
+        {
+            return VersionPreconditionHelper.VersionMismatch(
+                Response,
+                new ProcessStateVersionMismatchException(
+                    currentVersions.InstanceVersion,
+                    currentVersions.ProcessStateVersion
+                )
+            );
+        }
+
+        return null;
     }
 
     private void UpdateInstance(

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Extensions;
 using Altinn.Platform.Storage.Helpers;
 using Altinn.Platform.Storage.Interface.Models;
@@ -23,7 +24,6 @@ namespace Altinn.Platform.Storage.Controllers;
 [ApiController]
 public class DataLockController : ControllerBase
 {
-    private readonly IInstanceRepository _instanceRepository;
     private readonly IDataRepository _dataRepository;
     private readonly IAuthorization _authorizationService;
     private readonly IProcessAuthorizer _processAuthorizer;
@@ -31,18 +31,15 @@ public class DataLockController : ControllerBase
     /// <summary>
     /// Initializes a new instance of the <see cref="DataLockController"/> class
     /// </summary>
-    /// <param name="instanceRepository">the instance repository</param>
     /// <param name="dataRepository">the data repository handler</param>
     /// <param name="authorizationService">the authorization service.</param>
     /// <param name="processAuthorizer">the process authorizer.</param>
     public DataLockController(
-        IInstanceRepository instanceRepository,
         IDataRepository dataRepository,
         IAuthorization authorizationService,
         IProcessAuthorizer processAuthorizer
     )
     {
-        _instanceRepository = instanceRepository;
         _dataRepository = dataRepository;
         _authorizationService = authorizationService;
         _processAuthorizer = processAuthorizer;
@@ -56,6 +53,7 @@ public class DataLockController : ControllerBase
     /// <param name="dataGuid">The id of the data element to lock.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>DataElement that was locked</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpPut]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -79,20 +77,17 @@ public class DataLockController : ControllerBase
         CancellationToken cancellationToken
     )
     {
-        (InstanceInternal? instance, ActionResult? instanceError) = await GetInstanceAsync(
-            instanceGuid,
-            instanceOwnerPartyId,
-            true,
-            cancellationToken
-        );
-        if (instance == null)
+        (InstanceInternal? instance, ProblemDetails? lockProblem) =
+            await _authorizationService.GetAuthorizedInstance(
+                instanceOwnerPartyId,
+                instanceGuid,
+                _processAuthorizer.AuthorizeDataElementLock,
+                includeElements: true,
+                cancellationToken
+            );
+        if (instance is null)
         {
-            return instanceError!;
-        }
-
-        if (await _processAuthorizer.AuthorizeDataElementLock(instance) is { } lockProblem)
-        {
-            return lockProblem.ToResult();
+            return lockProblem!.ToResult();
         }
 
         DataElementInternal? dataElement = instance.Data.FirstOrDefault(d => d.Id == dataGuid);
@@ -138,6 +133,7 @@ public class DataLockController : ControllerBase
     /// <param name="dataGuid">The id of the data element to unlock.</param>
     /// <param name="cancellationToken">CancellationToken</param>
     /// <returns>DataElement that was unlocked</returns>
+    [InstanceScopeAccess(ScopeAccess.Write)]
     [Authorize]
     [HttpDelete]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -160,20 +156,16 @@ public class DataLockController : ControllerBase
         CancellationToken cancellationToken
     )
     {
-        (InstanceInternal? instance, _) = await GetInstanceAsync(
-            instanceGuid,
+        (_, ProblemDetails? unlockProblem) = await _authorizationService.GetAuthorizedInstance(
             instanceOwnerPartyId,
-            false,
+            instanceGuid,
+            instance =>
+                _authorizationService.AuthorizeAnyOfInstanceActions(
+                    instance,
+                    [AuthorizationActions.Write, "unlock", AuthorizationActions.Reject]
+                ),
+            includeElements: false,
             cancellationToken
-        );
-        if (instance == null)
-        {
-            return AuthorizationProblems.Forbidden().ToResult();
-        }
-
-        ProblemDetails? unlockProblem = await _authorizationService.AuthorizeAnyOfInstanceActions(
-            instance,
-            [AuthorizationActions.Write, "unlock", AuthorizationActions.Reject]
         );
         if (unlockProblem is not null)
         {
@@ -204,31 +196,5 @@ public class DataLockController : ControllerBase
                 ? StatusCode((int)e.StatusCodeSuggestion)
                 : StatusCode(500);
         }
-    }
-
-    private async Task<(InstanceInternal? Instance, ActionResult? ErrorMessage)> GetInstanceAsync(
-        Guid instanceGuid,
-        int instanceOwnerPartyId,
-        bool includeDataElements,
-        CancellationToken cancellationToken
-    )
-    {
-        InstanceInternal? instance = await _instanceRepository.GetOne(
-            instanceGuid,
-            includeDataElements,
-            cancellationToken
-        );
-
-        if (instance == null)
-        {
-            return (
-                null,
-                NotFound(
-                    $"Unable to find any instance with id: {instanceOwnerPartyId}/{instanceGuid}."
-                )
-            );
-        }
-
-        return (instance, null);
     }
 }
