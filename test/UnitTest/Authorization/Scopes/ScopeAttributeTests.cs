@@ -44,6 +44,17 @@ public class ScopeAttributeTests
         typeof(MigrationController),
     ];
 
+    /// <summary>
+    /// Controllers that may search instances through the query repository, which does not authorize the
+    /// instances it returns. Their search endpoints authorize the caller themselves: instance search filters
+    /// the results, and messagebox search is limited to the sync adapter.
+    /// </summary>
+    private static readonly Type[] _instanceQueryRepositoryUsers =
+    [
+        typeof(InstancesController),
+        typeof(MessageBoxInstancesController),
+    ];
+
     public static TheoryData<string> InstanceActions()
     {
         TheoryData<string> data = new();
@@ -97,30 +108,41 @@ public class ScopeAttributeTests
     [Fact]
     public void Controllers_DoNotTakeTheInstanceRepository()
     {
-        IEnumerable<string> offenders = typeof(InstancesController)
-            .Assembly.GetTypes()
-            .Where(type => typeof(ControllerBase).IsAssignableFrom(type) && !type.IsAbstract)
-            .Where(type => !_instanceRepositoryExceptions.Contains(type))
-            .Where(type =>
-                type.GetConstructors()
-                    .SelectMany(constructor => constructor.GetParameters())
-                    .Any(parameter => parameter.ParameterType == typeof(IInstanceRepository))
-            )
-            .Select(type => type.Name);
-
-        Assert.Empty(offenders);
+        Assert.Empty(
+            ControllersTaking(typeof(IInstanceRepository))
+                .Except(_instanceRepositoryExceptions)
+                .Select(type => type.Name)
+        );
     }
 
     [Fact]
     public void InstanceRepositoryExceptions_StillTakeTheInstanceRepository()
     {
-        foreach (Type controller in _instanceRepositoryExceptions)
-        {
-            Assert.Contains(
-                controller.GetConstructors().SelectMany(constructor => constructor.GetParameters()),
-                parameter => parameter.ParameterType == typeof(IInstanceRepository)
-            );
-        }
+        Assert.Empty(
+            _instanceRepositoryExceptions
+                .Except(ControllersTaking(typeof(IInstanceRepository)))
+                .Select(type => type.Name)
+        );
+    }
+
+    [Fact]
+    public void Controllers_DoNotTakeTheInstanceQueryRepository()
+    {
+        Assert.Empty(
+            ControllersTaking(typeof(IInstanceQueryRepository))
+                .Except(_instanceQueryRepositoryUsers)
+                .Select(type => type.Name)
+        );
+    }
+
+    [Fact]
+    public void InstanceQueryRepositoryUsers_StillTakeTheInstanceQueryRepository()
+    {
+        Assert.Empty(
+            _instanceQueryRepositoryUsers
+                .Except(ControllersTaking(typeof(IInstanceQueryRepository)))
+                .Select(type => type.Name)
+        );
     }
 
     private static IEnumerable<Type> ControllersTaking(params Type[] dependencies) =>
