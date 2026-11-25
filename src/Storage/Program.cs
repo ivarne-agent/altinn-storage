@@ -15,6 +15,7 @@ using Altinn.Common.PEP.Configuration;
 using Altinn.Common.PEP.Implementation;
 using Altinn.Common.PEP.Interfaces;
 using Altinn.Platform.Storage.Authorization;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Clients;
 using Altinn.Platform.Storage.Configuration;
 using Altinn.Platform.Storage.Extensions;
@@ -242,7 +243,9 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
         services.AddOpenTelemetry().UseOtlpExporter();
     }
 
-    services.AddControllersWithViews().AddNewtonsoftJson();
+    services
+        .AddControllersWithViews(options => options.Filters.Add<RequireScopeFilter>())
+        .AddNewtonsoftJson();
     services.AddMemoryCache();
     services.AddHealthChecks().AddCheck<HealthCheck>("storage_health_check");
 
@@ -329,6 +332,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration config)
 
     services.AddTransient<IAuthorizationHandler, ScopeAccessHandler>();
     services.AddTransient<IAuthorizationHandler, ClaimAccessHandler>();
+    services.AddTransient<IInstanceScopeAuthorizer, InstanceScopeAuthorizer>();
     services.AddTransient<IAuthorization, AuthorizationService>();
     services.AddTransient<IProcessAuthorizer, ProcessAuthorizer>();
     services.AddSingleton<IAccessTokenGenerator, AccessTokenGenerator>();

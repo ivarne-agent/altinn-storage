@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Altinn.Authorization.ABAC.Xacml;
 using Altinn.Authorization.ABAC.Xacml.JsonProfile;
+using Altinn.Platform.Storage.Authorization.Scopes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -35,6 +36,20 @@ internal static class AuthorizationProblems
         };
 
     /// <summary>
+    /// 403: the token has no scope that gives the access the endpoint requires. Retrying will not help.
+    /// Decided without asking Altinn Authorization.
+    /// </summary>
+    internal static ProblemDetails InsufficientScope(ScopeAccess access) =>
+        new()
+        {
+            Status = StatusCodes.Status403Forbidden,
+            Type = "insufficient_scope",
+            Title = "Insufficient scope",
+            Detail =
+                $"The token has no scope that gives {(access == ScopeAccess.Read ? "read" : "write")} access to this resource.",
+        };
+
+    /// <summary>
     /// 503: Altinn Authorization gave no decision, so it is unknown whether the caller is authorized.
     /// The caller may retry.
     /// </summary>
@@ -57,6 +72,18 @@ internal static class AuthorizationProblems
             Type = "instance_not_found",
             Title = "Instance not found",
             Detail = $"Unable to find any instance with id: {instanceOwnerPartyId}/{instanceGuid}.",
+        };
+
+    /// <summary>
+    /// 404: the caller is authorized, but the instance does not exist.
+    /// </summary>
+    internal static ProblemDetails NotFound(Guid instanceGuid) =>
+        new()
+        {
+            Status = StatusCodes.Status404NotFound,
+            Type = "instance_not_found",
+            Title = "Instance not found",
+            Detail = $"Unable to find instance {instanceGuid}",
         };
 
     /// <summary>

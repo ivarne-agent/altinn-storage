@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using Altinn.Platform.Storage.Authorization.Scopes;
 
 namespace Altinn.Platform.Storage.Configuration;
 
@@ -124,4 +125,22 @@ public class GeneralSettings
     /// </summary>
     [Range(1, 3600)]
     public int FileScanReadUrlLifetimeSeconds { get; set; } = 300;
+
+    /// <summary>
+    /// Gets or sets how the built-in API scopes are checked on instance endpoints: <c>altinn:instances.*</c>
+    /// for users, <c>altinn:serviceowner/instances.*</c> for service owners. It also governs the check that an
+    /// instance belongs to the party in the route.
+    /// </summary>
+    public ScopeCheckMode InstanceBuiltInScopeCheck { get; set; } = ScopeCheckMode.Off;
+
+    /// <summary>
+    /// Gets or sets how the API scopes that apps define in <c>apiScopes</c> are checked on instance endpoints.
+    /// When off, the apps' own scopes are ignored and the built-in scopes apply.
+    /// </summary>
+    public ScopeCheckMode InstanceAppScopeCheck { get; set; } = ScopeCheckMode.Off;
+
+    /// <summary>
+    /// Gets or sets how the sync adapter scope that the messagebox endpoints require is checked.
+    /// </summary>
+    public ScopeCheckMode MessageboxSyncAdapterScopeCheck { get; set; } = ScopeCheckMode.Off;
 }
