@@ -148,7 +148,7 @@ public class InstancesControllerTests : IAsyncLifetime
         string responseContent = await response.Content.ReadAsStringAsync();
         Instance instance = JsonConvert.DeserializeObject<Instance>(responseContent);
         Assert.Equal("1337", instance.InstanceOwner.PartyId);
-        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "read");
+        await _testTelemetry.AssertScopeCheckAsync(response, expectedScopeCheck, "read");
     }
 
     [Theory]
@@ -175,7 +175,7 @@ public class InstancesControllerTests : IAsyncLifetime
         string responseContent = await response.Content.ReadAsStringAsync();
         Instance instance = JsonConvert.DeserializeObject<Instance>(responseContent);
         Assert.Equal("1337/46133fb5-a9f2-45d4-90b1-f6d93ad40713", instance.Id);
-        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "read");
+        await _testTelemetry.AssertScopeCheckAsync(response, expectedScopeCheck, "read");
     }
 
     [Fact]
@@ -603,7 +603,7 @@ public class InstancesControllerTests : IAsyncLifetime
         string json = await response.Content.ReadAsStringAsync();
         Instance createdInstance = JsonConvert.DeserializeObject<Instance>(json);
         Assert.NotNull(createdInstance);
-        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "write");
+        await _testTelemetry.AssertScopeCheckAsync(response, expectedScopeCheck, "write");
     }
 
     [Theory]
@@ -636,7 +636,7 @@ public class InstancesControllerTests : IAsyncLifetime
         string json = await response.Content.ReadAsStringAsync();
         Instance createdInstance = JsonConvert.DeserializeObject<Instance>(json);
         Assert.NotNull(createdInstance);
-        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "write");
+        await _testTelemetry.AssertScopeCheckAsync(response, expectedScopeCheck, "write");
     }
 
     [Theory]
@@ -1265,7 +1265,7 @@ public class InstancesControllerTests : IAsyncLifetime
             Assert.Equal(expectedNoInstances, queryResponse.Count);
         }
 
-        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "read");
+        await _testTelemetry.AssertScopeCheckAsync(response, expectedScopeCheck, "read");
     }
 
     /// <summary>
@@ -3700,6 +3700,7 @@ public class InstancesControllerTests : IAsyncLifetime
         });
 
         var client = factory.CreateClient();
+        TestTelemetry.IdentifyRequests(client);
 
         _testTelemetry = factory.Services.GetRequiredService<TestTelemetry>();
 

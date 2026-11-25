@@ -65,7 +65,7 @@ public class ScopeCheckTests : IAsyncLifetime
 
         await AssertInsufficientScope(response);
         pdp.Verify(p => p.GetDecisionForRequest(It.IsAny<XacmlJsonRequestRoot>()), Times.Never);
-        await _telemetry.AssertScopeCheckAsync("missing_builtin", "read");
+        await _telemetry.AssertScopeCheckAsync(response, "missing_builtin", "read");
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public class ScopeCheckTests : IAsyncLifetime
         using HttpResponseMessage response = await client.GetAsync(InstancePath);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        await _telemetry.AssertScopeCheckAsync("missing_builtin", "read");
+        await _telemetry.AssertScopeCheckAsync(response, "missing_builtin", "read");
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class ScopeCheckTests : IAsyncLifetime
         using HttpResponseMessage response = await client.GetAsync(InstancePath);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        await _telemetry.AssertScopeCheckAsync("ok", "read");
+        await _telemetry.AssertScopeCheckAsync(response, "ok", "read");
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class ScopeCheckTests : IAsyncLifetime
         using HttpResponseMessage response = await client.GetAsync(InstancePath);
 
         await AssertInsufficientScope(response);
-        await _telemetry.AssertScopeCheckAsync("missing_app", "read");
+        await _telemetry.AssertScopeCheckAsync(response, "missing_app", "read");
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public class ScopeCheckTests : IAsyncLifetime
         using HttpResponseMessage response = await client.GetAsync(InstancePath);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        await _telemetry.AssertScopeCheckAsync("ok", "read");
+        await _telemetry.AssertScopeCheckAsync(response, "ok", "read");
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public class ScopeCheckTests : IAsyncLifetime
 
         await AssertInsufficientScope(response);
         pdp.Verify(p => p.GetDecisionForRequest(It.IsAny<XacmlJsonRequestRoot>()), Times.Never);
-        await _telemetry.AssertScopeCheckAsync("missing_builtin", "write");
+        await _telemetry.AssertScopeCheckAsync(response, "missing_builtin", "write");
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class ScopeCheckTests : IAsyncLifetime
         );
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        await _telemetry.AssertScopeCheckAsync("ok_serviceowner_app", "write");
+        await _telemetry.AssertScopeCheckAsync(response, "ok_serviceowner_app", "write");
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public class ScopeCheckTests : IAsyncLifetime
 
         await AssertInsufficientScope(response);
         pdp.Verify(p => p.GetDecisionForRequest(It.IsAny<XacmlJsonRequestRoot>()), Times.Never);
-        await _telemetry.AssertScopeCheckAsync("missing_syncadapter", "read");
+        await _telemetry.AssertScopeCheckAsync(response, "missing_syncadapter", "read");
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public class ScopeCheckTests : IAsyncLifetime
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        await _telemetry.AssertScopeCheckAsync("missing_syncadapter", "read");
+        await _telemetry.AssertScopeCheckAsync(response, "missing_syncadapter", "read");
     }
 
     private static void SetToken(HttpClient client, string token) =>
@@ -290,6 +290,7 @@ public class ScopeCheckTests : IAsyncLifetime
         });
 
         HttpClient client = factory.CreateClient();
+        TestTelemetry.IdentifyRequests(client);
         _telemetry = factory.Services.GetRequiredService<TestTelemetry>();
         return client;
     }

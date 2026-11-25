@@ -33,6 +33,8 @@ public sealed class TestApplicationFactory<TEntryPoint> : WebApplicationFactory<
                     httpClient.SetHandlerLifetime(Timeout.InfiniteTimeSpan)
                 );
 
+                services.AddSingleton<IStartupFilter, TestTelemetry.RequestIdStartupFilter>();
+
                 ConcurrentList<MetricSnapshot> metricsList = [];
                 services.AddSingleton(sp =>
                     ActivatorUtilities.CreateInstance<TestTelemetry>(sp, metricsList)

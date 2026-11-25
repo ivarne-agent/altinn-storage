@@ -89,7 +89,7 @@ public class DataControllerTests : IAsyncLifetime
         );
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "write");
+        await _testTelemetry.AssertScopeCheckAsync(response, expectedScopeCheck, "write");
     }
 
     [Fact]
@@ -525,7 +525,7 @@ public class DataControllerTests : IAsyncLifetime
         HttpResponseMessage response = await client.GetAsync(dataPathWithData);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        await _testTelemetry.AssertScopeCheckAsync(expectedScopeCheck, "read");
+        await _testTelemetry.AssertScopeCheckAsync(response, expectedScopeCheck, "read");
     }
 
     [Theory]
@@ -1985,6 +1985,7 @@ public class DataControllerTests : IAsyncLifetime
         });
 
         var client = factory.CreateClient();
+        TestTelemetry.IdentifyRequests(client);
         if (!string.IsNullOrEmpty(bearerAuthToken))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
