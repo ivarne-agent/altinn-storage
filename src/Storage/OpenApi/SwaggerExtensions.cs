@@ -76,6 +76,7 @@ public static class SwaggerExtensions
                 }
         );
         c.OperationFilter<ExplicitResponseContentTypes>();
+        c.OperationFilter<ScopeRequirements>();
         c.AddDocumentFilterInstance(new MoveBasePathToServerSection(V1PublicSwaggerDocName));
         c.AddDocumentFilterInstance(
             new MoveBasePathToServerSection(ApimSwaggerDocName, omitServers: true)

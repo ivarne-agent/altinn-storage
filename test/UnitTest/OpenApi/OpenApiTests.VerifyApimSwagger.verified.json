@@ -432,6 +432,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       },
       "get": {
@@ -525,6 +537,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       },
       "put": {
@@ -671,6 +695,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -766,6 +802,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -838,6 +886,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -964,6 +1024,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -1082,6 +1154,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -1194,6 +1278,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       },
       "delete": {
@@ -1294,6 +1390,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -1376,6 +1484,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       },
       "get": {
@@ -1473,6 +1593,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -1555,6 +1687,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -1657,6 +1801,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       },
       "patch": {
@@ -1748,6 +1904,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -1885,6 +2053,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -2166,6 +2346,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       },
       "post": {
@@ -2244,6 +2436,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -2316,6 +2520,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       },
       "delete": {
@@ -2433,6 +2649,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -2495,6 +2723,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -2594,6 +2834,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -2684,6 +2936,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -2796,7 +3060,29 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -2915,6 +3201,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -3034,6 +3332,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -3089,6 +3399,12 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "required": [
+            "altinn:storage/instances.syncadapter"
+          ]
         }
       }
     },
@@ -3149,6 +3465,12 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "required": [
+            "altinn:storage/instances.syncadapter"
+          ]
         }
       },
       "delete": {
@@ -3227,6 +3549,12 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "required": [
+            "altinn:storage/instances.syncadapter"
+          ]
         }
       }
     },
@@ -3279,6 +3607,12 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "required": [
+            "altinn:storage/instances.syncadapter"
+          ]
         }
       }
     },
@@ -3351,6 +3685,12 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "required": [
+            "altinn:storage/instances.syncadapter"
+          ]
         }
       }
     },
@@ -4028,6 +4368,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -4154,6 +4506,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -4216,6 +4580,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "read",
+          "users": [
+            "altinn:instances.read",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.read"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.read replaces altinn:instances.read for its instances. Its apiScopes.serviceOwners.read is accepted besides the built-in service owner scope."
         }
       }
     },
@@ -4456,6 +4832,18 @@
               }
             }
           }
+        },
+        "x-altinn-scopes": {
+          "access": "write",
+          "users": [
+            "altinn:instances.write",
+            "altinn:portal/enduser"
+          ],
+          "serviceOwners": [
+            "altinn:serviceowner/instances.write"
+          ],
+          "syncAdapter": "altinn:storage/instances.syncadapter",
+          "appDefined": "An app's apiScopes.users.write replaces altinn:instances.write for its instances. Its apiScopes.serviceOwners.write is accepted besides the built-in service owner scope."
         }
       }
     },
