@@ -312,7 +312,7 @@ public class AuthorizationService(
         {
             return (
                 null,
-                UserHasRequiredScope([_settings.InstanceSyncAdapterScope])
+                HasSyncAdapterScope()
                     ? AuthorizationProblems.NotFound(instanceOwnerPartyId, instanceGuid)
                     : AuthorizationProblems.Forbidden()
             );
@@ -962,6 +962,12 @@ public class AuthorizationService(
             return false;
         }
 
-        return UserHasRequiredScope([_settings.InstanceSyncAdapterScope]);
+        return HasSyncAdapterScope();
     }
+
+    private bool HasSyncAdapterScope() =>
+        ApiScopeRules.HasScope(
+            _claimsPrincipalProvider.GetUser(),
+            _settings.InstanceSyncAdapterScope
+        );
 }

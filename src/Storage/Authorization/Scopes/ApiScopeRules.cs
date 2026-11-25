@@ -76,6 +76,13 @@ public static class ApiScopeRules
     }
 
     /// <summary>
+    /// Whether the token has <paramref name="scope"/> as one of its scopes, see <see cref="GetScopes"/>.
+    /// A null or empty scope is never held.
+    /// </summary>
+    public static bool HasScope(ClaimsPrincipal user, string? scope) =>
+        !string.IsNullOrEmpty(scope) && GetScopes(user).Contains(scope);
+
+    /// <summary>
     /// Replaces the <c>[app]</c> and <c>[org]</c> placeholders in a scope configured by an app.
     /// Returns null when no scope is configured.
     /// </summary>

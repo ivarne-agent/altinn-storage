@@ -658,6 +658,64 @@ public class AuthorizationServiceTest
         pdp.Verify(m => m.GetDecisionForRequest(It.IsAny<XacmlJsonRequestRoot>()), Times.Once());
     }
 
+    [Theory]
+    [InlineData("altinn:storage/instances.syncadapterX")]
+    [InlineData("altinn:storage/instances.syncadapter.read")]
+    [InlineData("ALTINN:STORAGE/INSTANCES.SYNCADAPTER")]
+    public async Task AuthorizeInstanceRequest_ScopeResemblingSyncAdapter_DoesNotBypass(
+        string scope
+    )
+    {
+        // Arrange
+        Mock<IPDP> pdp = new();
+        pdp.Setup(m => m.GetDecisionForRequest(It.IsAny<XacmlJsonRequestRoot>()))
+            .ReturnsAsync(CreatePdpResponse("Deny"));
+        _claimsPrincipalProviderMock.Setup(c => c.GetUser()).Returns(CreateUserWithScope(scope));
+        AuthorizationService sut = CreateAuthorizationService(
+            pdp.Object,
+            _claimsPrincipalProviderMock.Object
+        );
+
+        // Act
+        ProblemDetails problem = await sut.AuthorizeInstanceRequest(CreateDomainInstance(), "read");
+
+        // Assert
+        Assert.Equal(StatusCodes.Status403Forbidden, problem?.Status);
+        pdp.Verify(m => m.GetDecisionForRequest(It.IsAny<XacmlJsonRequestRoot>()), Times.Once());
+    }
+
+    [Fact]
+    public async Task GetAuthorizedInstance_MissingInstanceScopeResemblingSyncAdapter_Returns403()
+    {
+        // Arrange
+        Guid instanceGuid = Guid.NewGuid();
+        Mock<IInstanceRepository> instanceRepository = new();
+        instanceRepository
+            .Setup(r => r.GetOne(instanceGuid, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((InstanceInternal)null);
+        _claimsPrincipalProviderMock
+            .Setup(c => c.GetUser())
+            .Returns(CreateUserWithScope("altinn:storage/instances.syncadapterX"));
+        AuthorizationService sut = CreateAuthorizationService(
+            new Mock<IPDP>(MockBehavior.Strict).Object,
+            _claimsPrincipalProviderMock.Object,
+            instanceRepository: instanceRepository.Object
+        );
+
+        // Act
+        (InstanceInternal result, ProblemDetails problem) = await sut.GetAuthorizedInstance(
+            1000,
+            instanceGuid,
+            "read",
+            false,
+            CancellationToken.None
+        );
+
+        // Assert
+        Assert.Equal(StatusCodes.Status403Forbidden, problem?.Status);
+        Assert.Null(result);
+    }
+
     [Fact]
     public async Task AuthorizeInstanceRequest_NoSyncAdapterScope_ReadWriteDeleteAction_CallsPdp()
     {

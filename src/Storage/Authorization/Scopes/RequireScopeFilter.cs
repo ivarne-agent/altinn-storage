@@ -35,7 +35,13 @@ internal sealed class RequireScopeFilter(
             return;
         }
 
-        bool hasScope = ApiScopeRules.GetScopes(context.HttpContext.User).Contains(attribute.Scope);
+        // The endpoints name the sync adapter scope by its default value, which is also what the OpenAPI
+        // document shows. The configured scope is the one checked, as on the instance endpoints.
+        string requiredScope =
+            attribute.Scope == ApiScopeRules.SyncAdapter
+                ? settings.Value.InstanceSyncAdapterScope
+                : attribute.Scope;
+        bool hasScope = ApiScopeRules.HasScope(context.HttpContext.User, requiredScope);
         ScopeDecision decision = new(
             hasScope ? ScopeCheckOutcome.SyncAdapter : ScopeCheckOutcome.MissingSyncAdapter,
             attribute.Access,

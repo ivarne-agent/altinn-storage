@@ -216,6 +216,27 @@ public class ScopeCheckTests : IAsyncLifetime
         await _telemetry.AssertScopeCheckAsync(response, "missing_syncadapter", "read");
     }
 
+    [Theory]
+    [InlineData("test:custom/syncadapter", HttpStatusCode.OK)]
+    [InlineData(ApiScopeRules.SyncAdapter, HttpStatusCode.Forbidden)]
+    public async Task Enforce_Messagebox_RequiresTheConfiguredSyncAdapterScope(
+        string tokenScope,
+        HttpStatusCode expected
+    )
+    {
+        HttpClient client = GetClient(
+            ScopeCheckMode.Enforce,
+            syncAdapterScope: "test:custom/syncadapter"
+        );
+        SetToken(client, PrincipalUtil.GetToken(3, 1337, 3, scopes: [tokenScope]));
+
+        using HttpResponseMessage response = await client.GetAsync(
+            "storage/api/v1/sbl/instances/1337/46133fb5-a9f2-45d4-90b1-f6d93ad40713"
+        );
+
+        Assert.Equal(expected, response.StatusCode);
+    }
+
     private static void SetToken(HttpClient client, string token) =>
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
@@ -230,7 +251,8 @@ public class ScopeCheckTests : IAsyncLifetime
     private HttpClient GetClient(
         ScopeCheckMode mode,
         Mock<IPDP>? pdp = null,
-        bool withApiScopes = false
+        bool withApiScopes = false,
+        string? syncAdapterScope = null
     )
     {
         Mock<IApplicationRepository> applicationRepository = new();
@@ -285,6 +307,10 @@ public class ScopeCheckTests : IAsyncLifetime
                     settings.InstanceBuiltInScopeCheck = mode;
                     settings.InstanceAppScopeCheck = mode;
                     settings.MessageboxSyncAdapterScopeCheck = mode;
+                    if (syncAdapterScope is not null)
+                    {
+                        settings.InstanceSyncAdapterScope = syncAdapterScope;
+                    }
                 });
             });
         });
