@@ -102,6 +102,73 @@ public class InstanceScopeAuthorizerTests
         }
     }
 
+    [Theory]
+    [InlineData(ScopeCheckMode.Observe, ScopeCheckMode.Observe, null, "ok")]
+    [InlineData(ScopeCheckMode.Enforce, ScopeCheckMode.Observe, null, "ok")]
+    [InlineData(
+        ScopeCheckMode.Enforce,
+        ScopeCheckMode.Observe,
+        "altinn:something",
+        "missing_builtin"
+    )]
+    public async Task AuthorizeInstance_AppLoadFails_AppliesBuiltInRulesUnlessAppScopesAreEnforced(
+        ScopeCheckMode builtInMode,
+        ScopeCheckMode appMode,
+        string? scopes,
+        string expectedOutcome
+    )
+    {
+        (InstanceScopeAuthorizer sut, HttpContext httpContext) = Create(
+            builtInMode,
+            scopes: scopes ?? ApiScopeRules.InstancesRead,
+            appMode: appMode,
+            applicationLoadFailure: new InvalidOperationException("database down")
+        );
+
+        ProblemDetails? problem = await sut.AuthorizeInstance(
+            CreateInstance(AppWithScopes),
+            CancellationToken.None
+        );
+
+        Assert.Equal(
+            builtInMode == ScopeCheckMode.Enforce && scopes is not null,
+            problem is not null
+        );
+        Assert.Contains(
+            new("scope_check", expectedOutcome),
+            httpContext.Features.Get<IHttpMetricsTagsFeature>()!.Tags
+        );
+    }
+
+    [Fact]
+    public async Task AuthorizeInstance_AppLoadFailsWhenAppScopesAreEnforced_Throws()
+    {
+        (InstanceScopeAuthorizer sut, _) = Create(
+            ScopeCheckMode.Observe,
+            scopes: ApiScopeRules.InstancesRead,
+            appMode: ScopeCheckMode.Enforce,
+            applicationLoadFailure: new InvalidOperationException("database down")
+        );
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.AuthorizeInstance(CreateInstance(AppWithScopes), CancellationToken.None)
+        );
+    }
+
+    [Fact]
+    public async Task AuthorizeInstance_AppLoadCancelled_Throws()
+    {
+        (InstanceScopeAuthorizer sut, _) = Create(
+            ScopeCheckMode.Observe,
+            scopes: ApiScopeRules.InstancesRead,
+            applicationLoadFailure: new OperationCanceledException()
+        );
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            sut.AuthorizeInstance(CreateInstance(AppWithScopes), CancellationToken.None)
+        );
+    }
+
     [Fact]
     public async Task AuthorizeInstance_SeveralChecks_RecordsTheFirstDecisionOnly()
     {
@@ -159,7 +226,9 @@ public class InstanceScopeAuthorizerTests
     private static (InstanceScopeAuthorizer Sut, HttpContext HttpContext) Create(
         ScopeCheckMode mode,
         string scopes = "altinn:something",
-        object[]? endpointMetadata = null
+        object[]? endpointMetadata = null,
+        ScopeCheckMode? appMode = null,
+        Exception? applicationLoadFailure = null
     )
     {
         DefaultHttpContext httpContext = new()
@@ -203,6 +272,15 @@ public class InstanceScopeAuthorizerTests
                     }
             );
 
+        if (applicationLoadFailure is not null)
+        {
+            applications
+                .Setup(r =>
+                    r.FindOne(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())
+                )
+                .ThrowsAsync(applicationLoadFailure);
+        }
+
         InstanceScopeAuthorizer sut = new(
             new HttpContextAccessor { HttpContext = httpContext },
             applications.Object,
@@ -210,7 +288,7 @@ public class InstanceScopeAuthorizerTests
                 new GeneralSettings
                 {
                     InstanceBuiltInScopeCheck = mode,
-                    InstanceAppScopeCheck = mode,
+                    InstanceAppScopeCheck = appMode ?? mode,
                     InstanceSyncAdapterScope = ApiScopeRules.SyncAdapter,
                 }
             ),

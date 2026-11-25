@@ -179,7 +179,18 @@ public sealed partial class InstanceScopeAuthorizer(
             return null;
         }
 
-        return await applicationRepository.FindOne(appId, parts[0], cancellationToken);
+        try
+        {
+            return await applicationRepository.FindOne(appId, parts[0], cancellationToken);
+        }
+        catch (Exception e)
+            when (e is not OperationCanceledException && AppMode != ScopeCheckMode.Enforce)
+        {
+            // Without enforcement, the app's own scopes cannot refuse the request, so a failure to load them
+            // must not fail it either. The built-in rules apply instead.
+            LogApplicationLoadFailed(logger, e, appId, AppMode);
+            return null;
+        }
     }
 
     private HttpContext GetHttpContext() =>
@@ -210,6 +221,17 @@ public sealed partial class InstanceScopeAuthorizer(
             $"The endpoint '{endpoint?.DisplayName}' declares no API scope requirement."
         );
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Could not load the app metadata of {AppId} to check its API scopes; the built-in scope rules apply. App scope mode: {Mode}"
+    )]
+    private static partial void LogApplicationLoadFailed(
+        ILogger logger,
+        Exception exception,
+        string appId,
+        ScopeCheckMode mode
+    );
 
     [LoggerMessage(
         Level = LogLevel.Warning,
