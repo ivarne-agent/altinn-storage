@@ -121,6 +121,175 @@ public class ApiScopeRulesTests
         }
     }
 
+    /// <summary>
+    /// Mixed modes on an app with its own scopes: built-in mode, app mode, caller, token scope, the expected
+    /// outcome and mode, and whether the request is refused. Each row runs for Read and Write.
+    /// </summary>
+    public static TheoryData<
+        ScopeCheckMode,
+        ScopeCheckMode,
+        Caller,
+        TokenScope,
+        ScopeCheckOutcome,
+        ScopeCheckMode,
+        bool
+    > MixedModes()
+    {
+        const ScopeCheckMode Off = ScopeCheckMode.Off;
+        const ScopeCheckMode Observe = ScopeCheckMode.Observe;
+        const ScopeCheckMode Enforce = ScopeCheckMode.Enforce;
+        const ScopeCheckOutcome Missing = ScopeCheckOutcome.MissingApp;
+
+        TheoryData<
+            ScopeCheckMode,
+            ScopeCheckMode,
+            Caller,
+            TokenScope,
+            ScopeCheckOutcome,
+            ScopeCheckMode,
+            bool
+        > data = new();
+        foreach (Caller user in new[] { Caller.User, Caller.SystemUser })
+        {
+            // Built-in Enforce, app Observe or Off.
+            data.Add(Enforce, Observe, user, TokenScope.Wrong, Missing, Enforce, true);
+            data.Add(Enforce, Observe, user, TokenScope.BuiltIn, Missing, Observe, false);
+            data.Add(Enforce, Observe, user, TokenScope.BuiltInOtherLevel, Missing, Enforce, true);
+            data.Add(
+                Enforce,
+                Observe,
+                user,
+                TokenScope.Portal,
+                ScopeCheckOutcome.Ok,
+                Observe,
+                false
+            );
+            data.Add(Enforce, Observe, user, TokenScope.App, ScopeCheckOutcome.Ok, Observe, false);
+            data.Add(
+                Enforce,
+                Off,
+                user,
+                TokenScope.Wrong,
+                ScopeCheckOutcome.MissingBuiltIn,
+                Enforce,
+                true
+            );
+            data.Add(Enforce, Off, user, TokenScope.BuiltIn, ScopeCheckOutcome.Ok, Enforce, false);
+            data.Add(
+                Enforce,
+                Off,
+                user,
+                TokenScope.App,
+                ScopeCheckOutcome.MissingBuiltIn,
+                Enforce,
+                true
+            );
+
+            // App Enforce, built-in Observe or Off.
+            data.Add(Observe, Enforce, user, TokenScope.Wrong, Missing, Enforce, true);
+            data.Add(Observe, Enforce, user, TokenScope.BuiltIn, Missing, Enforce, true);
+            data.Add(Observe, Enforce, user, TokenScope.App, ScopeCheckOutcome.Ok, Enforce, false);
+            data.Add(Off, Enforce, user, TokenScope.Wrong, Missing, Enforce, true);
+            data.Add(Off, Enforce, user, TokenScope.BuiltIn, Missing, Enforce, true);
+
+            // Built-in Observe, app Off or Observe never refuse.
+            data.Add(
+                Observe,
+                Off,
+                user,
+                TokenScope.Wrong,
+                ScopeCheckOutcome.MissingBuiltIn,
+                Observe,
+                false
+            );
+            data.Add(Off, Observe, user, TokenScope.Wrong, Missing, Observe, false);
+        }
+
+        Caller so = Caller.ServiceOwner;
+        data.Add(Enforce, Observe, so, TokenScope.Wrong, Missing, Enforce, true);
+        data.Add(Enforce, Observe, so, TokenScope.BuiltInOtherLevel, Missing, Enforce, true);
+        data.Add(
+            Enforce,
+            Observe,
+            so,
+            TokenScope.BuiltIn,
+            ScopeCheckOutcome.OkServiceOwnerBuiltIn,
+            Enforce,
+            false
+        );
+        data.Add(
+            Enforce,
+            Observe,
+            so,
+            TokenScope.App,
+            ScopeCheckOutcome.OkServiceOwnerApp,
+            Observe,
+            false
+        );
+        data.Add(
+            Enforce,
+            Off,
+            so,
+            TokenScope.Wrong,
+            ScopeCheckOutcome.MissingBuiltIn,
+            Enforce,
+            true
+        );
+        data.Add(Enforce, Off, so, TokenScope.App, ScopeCheckOutcome.MissingBuiltIn, Enforce, true);
+        data.Add(Observe, Enforce, so, TokenScope.Wrong, Missing, Enforce, true);
+        data.Add(
+            Off,
+            Enforce,
+            so,
+            TokenScope.BuiltIn,
+            ScopeCheckOutcome.OkServiceOwnerBuiltIn,
+            Off,
+            false
+        );
+        data.Add(
+            Off,
+            Enforce,
+            so,
+            TokenScope.App,
+            ScopeCheckOutcome.OkServiceOwnerApp,
+            Enforce,
+            false
+        );
+        data.Add(Off, Observe, so, TokenScope.Wrong, Missing, Observe, false);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(MixedModes))]
+    public void Decide_MixedModes_NeverProtectsAppScopesLessThanBuiltIn(
+        ScopeCheckMode builtInMode,
+        ScopeCheckMode appMode,
+        Caller caller,
+        TokenScope tokenScope,
+        ScopeCheckOutcome expectedOutcome,
+        ScopeCheckMode expectedMode,
+        bool expectedRefuses
+    )
+    {
+        foreach (ScopeAccess access in new[] { ScopeAccess.Read, ScopeAccess.Write })
+        {
+            ClaimsPrincipal user = CreateUser(caller, ScopeFor(caller, tokenScope, access));
+            ScopeDecision decision = ApiScopeRules.Decide(
+                ApiScopeRules.GetScopes(user),
+                caller == Caller.ServiceOwner,
+                access,
+                CreateApp(true),
+                builtInMode,
+                appMode,
+                ApiScopeRules.SyncAdapter
+            );
+
+            Assert.Equal(expectedOutcome, decision.Outcome);
+            Assert.Equal(expectedMode, decision.Mode);
+            Assert.Equal(expectedRefuses, decision.Refuses);
+        }
+    }
+
     [Fact]
     public void Decide_AppScopeOfOneApp_DoesNotGiveAccessToAnother()
     {

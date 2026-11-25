@@ -18,7 +18,8 @@ namespace Altinn.Platform.Storage.Authorization.Scopes;
 /// one, otherwise the built-in user scope. <c>altinn:portal/enduser</c> is always accepted.</item>
 /// </list>
 /// An unknown app, such as the app of a missing instance, has no scopes of its own. When the app-defined
-/// check is off, the app's own scopes are ignored and the built-in rules apply.
+/// check is off, the app's own scopes are ignored and the built-in rules apply. A token that lacks both the
+/// app's scope and the built-in scope is governed by the stricter of the two modes.
 /// </remarks>
 public static class ApiScopeRules
 {
@@ -120,9 +121,40 @@ public static class ApiScopeRules
         ApiScopesConfiguration? appScopes =
             appMode == ScopeCheckMode.Off ? null : application?.ApiScopes;
 
-        return isServiceOwner
+        ScopeDecision decision = isServiceOwner
             ? DecideServiceOwner(scopes, access, application, appScopes, builtInMode, appMode)
             : DecideUser(scopes, access, application, appScopes, builtInMode, appMode);
+
+        // An app's own scopes must never give weaker protection than the built-in scopes. When the
+        // app-defined check does not refuse, a token that also fails the built-in rule is governed by the
+        // stricter of the two modes.
+        if (
+            decision.Outcome == ScopeCheckOutcome.MissingApp
+            && appMode != ScopeCheckMode.Enforce
+            && !HasBuiltInScope(scopes, isServiceOwner, access)
+        )
+        {
+            return decision with { Mode = builtInMode > appMode ? builtInMode : appMode };
+        }
+
+        return decision;
+    }
+
+    private static bool HasBuiltInScope(
+        IReadOnlySet<string> scopes,
+        bool isServiceOwner,
+        ScopeAccess access
+    )
+    {
+        if (isServiceOwner)
+        {
+            return scopes.Contains(
+                access == ScopeAccess.Read ? ServiceOwnerInstancesRead : ServiceOwnerInstancesWrite
+            );
+        }
+
+        return scopes.Contains(PortalEndUser)
+            || scopes.Contains(access == ScopeAccess.Read ? InstancesRead : InstancesWrite);
     }
 
     private static ScopeDecision DecideServiceOwner(
