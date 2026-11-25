@@ -390,14 +390,14 @@ public class DomainModelContractTests
     [Fact]
     public void InstanceRepository_WriteSignaturesUseDomainValuesAndMinimalIdentifier()
     {
-        MethodInfo create = Assert.Single(typeof(IInstanceRepository).GetMethods(), method =>
-            method.Name == nameof(IInstanceRepository.Create)
+        MethodInfo create = Assert.Single(typeof(IInstanceWriteRepository).GetMethods(), method =>
+            method.Name == nameof(IInstanceWriteRepository.Create)
         );
         Assert.Equal(typeof(InstanceInternal), create.GetParameters()[0].ParameterType);
         Assert.Equal(typeof(InstanceInternal), create.ReturnType.GetGenericArguments().Single());
 
-        MethodInfo delete = Assert.Single(typeof(IInstanceRepository).GetMethods(), method =>
-            method.Name == nameof(IInstanceRepository.Delete)
+        MethodInfo delete = Assert.Single(typeof(IInstanceWriteRepository).GetMethods(), method =>
+            method.Name == nameof(IInstanceWriteRepository.Delete)
         );
         Assert.Equal(typeof(Guid), delete.GetParameters()[0].ParameterType);
 

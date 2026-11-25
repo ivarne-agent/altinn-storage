@@ -28,6 +28,12 @@ public static class ServiceCollectionExtensions
             .AddSingleton<IDataRepository, PgDataRepository>()
             .AddSingleton<IInstanceEventRepository, PgInstanceEventRepository>()
             .AddSingleton<IInstanceRepository, PgInstanceRepository>()
+            .AddSingleton<IInstanceWriteRepository>(sp =>
+                sp.GetRequiredService<IInstanceRepository>()
+            )
+            .AddSingleton<IInstanceQueryRepository>(sp =>
+                sp.GetRequiredService<IInstanceRepository>()
+            )
             .AddSingleton<OutboxInsertRowFactory>()
             .AddSingleton<IInstanceMutationRepository, PgInstanceMutationRepository>()
             .AddSingleton<IBlobRepository, BlobRepository>()
