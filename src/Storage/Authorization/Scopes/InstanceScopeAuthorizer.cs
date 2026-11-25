@@ -69,7 +69,7 @@ public sealed partial class InstanceScopeAuthorizer(
     )
     {
         HttpContext httpContext = GetHttpContext();
-        if (GetRequiredAccess(httpContext) is not { } access || IsOff())
+        if (IsOff() || GetRequiredAccess(httpContext) is not { } access)
         {
             return null;
         }
@@ -87,7 +87,7 @@ public sealed partial class InstanceScopeAuthorizer(
     )
     {
         HttpContext httpContext = GetHttpContext();
-        if (GetRequiredAccess(httpContext) is not { } access || IsOff())
+        if (IsOff() || GetRequiredAccess(httpContext) is not { } access)
         {
             return null;
         }

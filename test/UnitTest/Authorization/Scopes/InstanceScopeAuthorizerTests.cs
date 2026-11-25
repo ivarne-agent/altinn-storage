@@ -35,6 +35,17 @@ public class InstanceScopeAuthorizerTests
     }
 
     [Fact]
+    public async Task AuthorizeInstance_EndpointWithoutScopeAttribute_PassesWhenEveryModeIsOff()
+    {
+        (InstanceScopeAuthorizer sut, _) = Create(ScopeCheckMode.Off, endpointMetadata: []);
+
+        Assert.Null(
+            await sut.AuthorizeInstance(CreateInstance(AppWithoutScopes), CancellationToken.None)
+        );
+        Assert.Null(await sut.AuthorizeApplication(AppWithoutScopes, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task AuthorizeInstance_FixedScopeEndpoint_IsLeftToTheFilter()
     {
         (InstanceScopeAuthorizer sut, HttpContext httpContext) = Create(

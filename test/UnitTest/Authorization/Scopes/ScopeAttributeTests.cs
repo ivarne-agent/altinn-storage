@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Altinn.Platform.Storage.Authorization;
 using Altinn.Platform.Storage.Authorization.Scopes;
 using Altinn.Platform.Storage.Controllers;
 using Altinn.Platform.Storage.Repository;
@@ -15,19 +16,20 @@ namespace Altinn.Platform.Storage.UnitTest.Authorization.Scopes;
 public class ScopeAttributeTests
 {
     /// <summary>
-    /// The controllers whose endpoints concern instances, so each must declare its API scope requirement.
+    /// Controllers that take the authorization service or the scope authorizer but whose endpoints need no
+    /// API scope declaration.
+    /// </summary>
+    private static readonly Type[] _instanceControllerExceptions = [];
+
+    /// <summary>
+    /// The controllers whose endpoints concern instances, so each must declare its API scope requirement:
+    /// every controller that takes the authorization service or the scope authorizer.
     /// </summary>
     private static readonly Type[] _instanceControllers =
     [
-        typeof(InstancesController),
-        typeof(DataController),
-        typeof(DataLockController),
-        typeof(InstanceEventsController),
-        typeof(InstanceLockController),
-        typeof(InstanceMutationsController),
-        typeof(ProcessController),
-        typeof(SignController),
-        typeof(MessageBoxInstancesController),
+        .. ControllersTaking(typeof(IAuthorization), typeof(IInstanceScopeAuthorizer))
+            .Except(_instanceControllerExceptions)
+            .OrderBy(type => type.Name, StringComparer.Ordinal),
     ];
 
     /// <summary>
@@ -84,6 +86,15 @@ public class ScopeAttributeTests
     }
 
     [Fact]
+    public void InstanceControllers_IncludeTheKnownInstanceControllers()
+    {
+        Assert.Contains(typeof(InstancesController), _instanceControllers);
+        Assert.Contains(typeof(DataController), _instanceControllers);
+        Assert.Contains(typeof(InstanceMutationsController), _instanceControllers);
+        Assert.Contains(typeof(MessageBoxInstancesController), _instanceControllers);
+    }
+
+    [Fact]
     public void Controllers_DoNotTakeTheInstanceRepository()
     {
         IEnumerable<string> offenders = typeof(InstancesController)
@@ -111,6 +122,16 @@ public class ScopeAttributeTests
             );
         }
     }
+
+    private static IEnumerable<Type> ControllersTaking(params Type[] dependencies) =>
+        typeof(InstancesController)
+            .Assembly.GetTypes()
+            .Where(type => typeof(ControllerBase).IsAssignableFrom(type) && !type.IsAbstract)
+            .Where(type =>
+                type.GetConstructors()
+                    .SelectMany(constructor => constructor.GetParameters())
+                    .Any(parameter => dependencies.Contains(parameter.ParameterType))
+            );
 
     private static IEnumerable<MethodInfo> GetInstanceActions() =>
         _instanceControllers.SelectMany(controller =>
