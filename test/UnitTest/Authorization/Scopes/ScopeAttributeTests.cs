@@ -55,6 +55,17 @@ public class ScopeAttributeTests
         typeof(MessageBoxInstancesController),
     ];
 
+    /// <summary>
+    /// Controllers that may change instances through the write repository. It cannot load instances, so
+    /// they still get each instance through the authorization service before changing it.
+    /// </summary>
+    private static readonly Type[] _instanceWriteRepositoryUsers =
+    [
+        typeof(InstancesController),
+        typeof(ProcessController),
+        typeof(MessageBoxInstancesController),
+    ];
+
     public static TheoryData<string> InstanceActions()
     {
         TheoryData<string> data = new();
@@ -141,6 +152,26 @@ public class ScopeAttributeTests
         Assert.Empty(
             _instanceQueryRepositoryUsers
                 .Except(ControllersTaking(typeof(IInstanceQueryRepository)))
+                .Select(type => type.Name)
+        );
+    }
+
+    [Fact]
+    public void Controllers_DoNotTakeTheInstanceWriteRepository()
+    {
+        Assert.Empty(
+            ControllersTaking(typeof(IInstanceWriteRepository))
+                .Except(_instanceWriteRepositoryUsers)
+                .Select(type => type.Name)
+        );
+    }
+
+    [Fact]
+    public void InstanceWriteRepositoryUsers_StillTakeTheInstanceWriteRepository()
+    {
+        Assert.Empty(
+            _instanceWriteRepositoryUsers
+                .Except(ControllersTaking(typeof(IInstanceWriteRepository)))
                 .Select(type => type.Name)
         );
     }
